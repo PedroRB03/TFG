@@ -1,0 +1,12 @@
+Después de investigar un poco he encontrado que:
+- La api de twitter es de pago
+- Usar web crawlers entre otros sin la api están betados en twitter (no valdría scrapy), me juego que me baneen de ip
+- La mayoría de web scrapers pa twitter están deprecados
+- Hay datasets pero no se si contienen "ragebait" en concreto, ya me es difícil que contengan burla en general
+- Twitter (solo leer 100 posts al mes) y reddit (100 llamadas a la api por minuto) tienen tiers gratis para usar su api
+- Podría automatizar detección de ragebait para entreno, pillando menciones a r/ragebait
+- Para reddit existe PRAW (facilita el uso de la api)
+- Facebook tiene su api gratis (api graph)
+- Parte del ragebait se encuentra en memes en imágenes, habría que hacer detección de texto
+
+Conclusión: igual rentaría pasarse a facebook y reddit y dejar twitter
