@@ -49,6 +49,7 @@ else:
                 
 
                 comms = {}
+                #sub.comment_sort = "top"
                 for c in sub.comments.list():
                     if type(c) is praw.models.Comment and not c.distinguished and c.parent_id == "t3_"+sub.id:
                         cfield = {}
