@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import re
 
-COMM_LIMIT=40
+MAX_CHAR=2000
 
 dcc = {}
 with open("reddit_db.json", "r", encoding="utf-8") as f:
@@ -25,13 +25,11 @@ for k in dcc:
     #data["post"].append(dcc[k]["title"]+".\n"+dcc[k]["selftext"])
     #data["upvote_ratio"].append(dcc[k]["upvote_ratio"])
     #data["score"].append(dcc[k]["score"])
-    i=0
     for c in dcc[k]["comments"]:
-        if i >= COMM_LIMIT:
-            break
         bod = dcc[k]["comments"][c]["body"]
+        #if len(comms+bod+" ") > MAX_CHAR:
+        #    break
         if not pattern.match(bod) and len(bod) > 0:
-            i+=1
             comms+=bod+" "
     #data["comments"].append(comms)
     data["post"].append(comms)

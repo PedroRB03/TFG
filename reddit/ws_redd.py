@@ -84,28 +84,4 @@ except KeyboardInterrupt:
     print(f"Terminado a mano con {fi} casos de un total de {len(skip)}.")
 except praw.exceptions.PRAWException:
     print("Terminado por TooManyRequests.")
-#try:
-#    for snam in subs:
-#        subr = reddit.subreddit(snam)
-#        print(f"sub {snam}")
-#        for i,sub in enumerate(subr.new(limit=1000),1):
-#            for c in sub.comments:
-#                if c is praw.models.Comment and sub.id not in skip and not sub.distinguished and not c.distinguished and c.parent_id == "t3_"+sub.id and pattern.match(c.body):
-#                    found.append([sub.id, c.id,"https://www.reddit.com/"+c.permalink]) # metemos para guardar
-#                    skip.add(sub.id) # evitamos repeticiones del mismo post
-#                    print(f"[{c.subreddit.display_name}] sub: {sub.id}, com: {c.id} - https://www.reddit.com/{c.permalink}")
-#                if len(found) >= limit:
-#                    break
-#            if i%10 == 0:
-#                print(f"subm {i}")
-#            if len(found) >= limit:
-#                break
-#        if len(found) >= limit:
-#            break
-#        else:
-#            subsleft.pop(0)
-#except KeyboardInterrupt:
-#    print(f"Terminado a mano con {len(found)} casos de un total de {len(skip)}.")
-#except praw.exceptions.TooManyRequests:
-#    print(f"Cortado, demasiadas requests")
 guardar(found)

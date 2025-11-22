@@ -1,27 +1,19 @@
-import os
-import json
 import pandas as pd
 import optuna
-from sklearn import svm
+from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from lightgbm import LGBMClassifier
 from sklearn.metrics import classification_report, confusion_matrix
-
-
-# --- 1. Cargar el JSON ---
-
-if not os.path.exists("tab_db.json"):
-    with open("tab_db.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
 
 
 # --- 2. Preparamos preprocesos y vectorizador ---
 
 tfidf_p = TfidfVectorizer(
-    max_features=1980,
-    ngram_range=(1,2),
+    max_features=23838,    
+    ngram_range=(1,2),    
     stop_words="english",
     lowercase=True
 )
@@ -32,23 +24,19 @@ preprocessor = ColumnTransformer(
     ],
     remainder='drop'  # ignora el resto de columnas
 )
-
 # --- 3. Configuramos modelo y pipeline
 
-#model = svm.SVC(
-#    decision_function_shape="ovr",
-#    class_weight="balanced",
-#    break_ties=True,
-#    C=192,
-#    gamma=0.45
-#)
-
-model = svm.NuSVC(
-    nu=.5,
-    decision_function_shape="ovr",
+model = LGBMClassifier(
+    n_estimators=182,
+    learning_rate=0.06,
+    subsample=0.5939,
+    min_child_samples=30,
+    num_leaves=75,
+    colsample_bytree=0.962,
     class_weight='balanced',
-    break_ties=True,
-    gamma=0.45
+    objective='multiclass',
+    num_class=3,
+    max_depth=1
 )
 
 pipeline = Pipeline([
@@ -60,11 +48,15 @@ def objective(trial):
     # === Hiperparámetros a optimizar ===
     ngrams = [(1,2),(1,3),(2,3),(2,4),(2,5)]
     params = {
+        'clf__num_leaves': trial.suggest_int('num_leaves', 5, 255),
+        'clf__learning_rate': trial.suggest_float('learning_rate', 0.01, 0.8, log=True),
+        'clf__n_estimators': trial.suggest_int('n_estimators', 100, 800),
+        'clf__subsample': trial.suggest_float('subsample', 0.5, 1.0),
+        'clf__colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
+        'clf__max_depth': trial.suggest_int('max_depth', -1, 12),
+        'clf__min_child_samples': trial.suggest_int('min_child_samples', 10, 100),
         'prepro__post_tfidf__max_features': trial.suggest_int('max_features',1000,50000),
-        'prepro__post_tfidf__ngram_range': ngrams[trial.suggest_int('ngram',0,len(ngrams)-1)],
-        'clf__C' : trial.suggest_categorical('C', range(160,200,1)),
-        'clf__gamma' : trial.suggest_categorical('gamma',[x / 1000.0 for x in range(300,500,25)] ),
-        'clf__decision_function_shape' : trial.suggest_categorical('fshape',['ovr','ovo'])
+        'prepro__post_tfidf__ngram_range': ngrams[trial.suggest_int('ngram',0,len(ngrams)-1)]
     }
 
     # Actualiza el modelo dentro del pipeline
@@ -78,6 +70,7 @@ def objective(trial):
         n_jobs=-1
     )
 
+    # Devuelve la métrica promedio (Optuna maximiza por defecto si usas direction='maximize')
     return scores.mean()
 
 
@@ -93,7 +86,6 @@ y_test = pd.read_pickle("y_test.pkl")
 #study.optimize(objective, n_trials=1000)
 #print("Mejores hiperparámetros:", study.best_params)
 #print("Mejor puntuación F1:", study.best_value)
-
 
 pipeline.fit(X_train, y_train)
 # --- 5. Evaluación ---
