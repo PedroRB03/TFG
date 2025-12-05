@@ -1,29 +1,23 @@
-import os
-import json
+
 import pandas as pd
 import optuna
 import time
 from sklearn import svm
 import torch
 import numpy as np
-from wordcloud import WordCloud
 from sklearn.base import TransformerMixin, BaseEstimator
-from sklearn.model_selection import cross_val_score
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import (
+    f1_score,
+    roc_auc_score,
+    matthews_corrcoef,
+    balanced_accuracy_score,
+    classification_report, 
+    confusion_matrix
+)
 from transformers import AutoTokenizer, AutoModel
 from lightgbm import LGBMClassifier
 
-# --- 1. Cargar el JSON ---
 
-if not os.path.exists("tab_db.json"):
-    with open("tab_db.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-
-# --- 2. Preparamos preprocesos y vectorizador ---
 torch.backends.cudnn.benchmark = True
 
 class DebertaEmbeddings(BaseEstimator, TransformerMixin):
@@ -90,10 +84,17 @@ model2 = svm.NuSVC(
     decision_function_shape="ovr",
     class_weight='balanced',
     break_ties=True,
-    gamma=0.45
+    gamma=0.45,
+    probability=True
 )
 
+# --- 1. Extraer numéricos
+num_features_train = X_train[["upvote_ratio", "score"]].values
+num_features_test  = X_test[["upvote_ratio", "score"]].values
 
+# --- 2. Concatenar los embeddings con los numéricos
+X_train_final = np.hstack([X_train_emb, num_features_train])
+X_test_final  = np.hstack([X_test_emb,  num_features_test])
 
 
 # --- 4. Separamos datos y entrenamos
@@ -125,14 +126,28 @@ model2 = svm.NuSVC(
 #print("Mejores hiperparámetros:", study.best_params)
 #print("Mejor puntuación F1:", study.best_value)
 
+
+
 t = time.perf_counter()
-model.fit(X_train_emb, y_train)
+model.fit(X_train_final, y_train)
 print("Entrenamiento: "+str(time.perf_counter()-t))
 # --- 5. Evaluación ---
 t = time.perf_counter()
-y_pred = model.predict(X_test_emb)
+y_pred = model.predict(X_test_final)
 print("Test: "+str(time.perf_counter()-t))
 
 print(classification_report(y_test, y_pred))
 print("Matriz de confusión:")
 print(confusion_matrix(y_test, y_pred))
+
+macro_f1 = f1_score(y_test, y_pred, average='macro')
+probs = model.predict_proba(X_test_final)
+roc_auc = roc_auc_score(y_test, probs, multi_class='ovr')
+mcc = matthews_corrcoef(y_test, y_pred)
+bal_acc = balanced_accuracy_score(y_test, y_pred)
+
+print("\nMétricas adicionales:")
+print(f"Macro F1: {macro_f1:.4f}")
+print(f"ROC-AUC (OvR): {roc_auc}")
+print(f"MCC: {mcc:.4f}")
+print(f"Balanced Accuracy: {bal_acc:.4f}")

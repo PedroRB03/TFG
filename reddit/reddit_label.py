@@ -3,9 +3,11 @@ import os
 import json
 import re
 import csv
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
+
 
 # Configura con tus credenciales de la app
 reddit = praw.Reddit(
@@ -15,7 +17,9 @@ reddit = praw.Reddit(
     rate_limit = 300
 )
 # Crear csv si no existe
+OVERWRITE = False
 bddir = 'bd/reddit/to_label.csv'
+destdir = "reddit_db.json"
 
 levels = [0,0,0]
 
@@ -28,12 +32,19 @@ print ("Procesando...")
 if not os.path.exists(bddir):
     f = open(bddir,'w', encoding='utf-8')
     f.close()
-else:
-    with open(bddir,newline='', encoding='utf-8') as f:
-        reader = csv.reader(f)
-        for i,row in enumerate(reader,1):
+
+
+if os.path.exists(destdir) and not OVERWRITE:
+    with open(destdir,newline='', encoding='utf-8') as f:
+        fields = json.load(f)
+
+
+with open(bddir,newline='', encoding='utf-8') as f:
+    reader = csv.reader(f)
+    for i,row in enumerate(reader,1):
+        #time.sleep(0.1)
+        if row[0] not in fields['posts']:
             print(f"Procesando {row[0]}, {i}")
-            #time.sleep(1)
             try:
                 sub = reddit.submission(id=row[0])
                 field = {}
@@ -70,11 +81,17 @@ else:
                         levels[2]+=1
             except praw.exceptions.PRAWException:
                 print("ERROR AL CARGAR POST!")
+            except Exception as e:
+                print("ERROR AL CARGAR POST!\nExcepción de tipo:")
+                print(e)
+        else:
+            print("Saltando "+ row[0] + "...")
+
 
 
 print(f"Se han encontrado {levels[0]} casos sin rb, {levels[1]} que pueden ser rb y {levels[2]} casos que son rb.")
 print("Guardando...")
-with open('reddit_db.json','w') as f:
+with open(destdir,'w') as f:
     json.dump(fields,f)
 print("Guardado")
 

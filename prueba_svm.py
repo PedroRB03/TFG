@@ -7,8 +7,15 @@ from sklearn.model_selection import cross_val_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, confusion_matrix
-
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import (
+    f1_score,
+    roc_auc_score,
+    matthews_corrcoef,
+    balanced_accuracy_score,
+    classification_report, 
+    confusion_matrix
+)
 
 # --- 1. Cargar el JSON ---
 
@@ -28,7 +35,8 @@ tfidf_p = TfidfVectorizer(
 
 preprocessor = ColumnTransformer(
     transformers=[
-        ('post_tfidf', tfidf_p, 'post')
+        ('post_tfidf', tfidf_p, 'post'),
+        ('nums', StandardScaler(), ['upvote_ratio','score'])
     ],
     remainder='drop'  # ignora el resto de columnas
 )
@@ -48,7 +56,8 @@ model = svm.NuSVC(
     decision_function_shape="ovr",
     class_weight='balanced',
     break_ties=True,
-    gamma=0.45
+    gamma=0.45,
+    probability=True
 )
 
 pipeline = Pipeline([
@@ -102,3 +111,15 @@ y_pred = pipeline.predict(X_test)
 print(classification_report(y_test, y_pred))
 print("Matriz de confusión:")
 print(confusion_matrix(y_test, y_pred))
+
+macro_f1 = f1_score(y_test, y_pred, average='macro')
+probs = pipeline.predict_proba(X_test)
+roc_auc = roc_auc_score(y_test, probs, multi_class='ovr')
+mcc = matthews_corrcoef(y_test, y_pred)
+bal_acc = balanced_accuracy_score(y_test, y_pred)
+
+print("\nMétricas adicionales:")
+print(f"Macro F1: {macro_f1:.4f}")
+print(f"ROC-AUC (OvR): {roc_auc}")
+print(f"MCC: {mcc:.4f}")
+print(f"Balanced Accuracy: {bal_acc:.4f}")
