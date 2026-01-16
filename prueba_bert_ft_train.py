@@ -16,9 +16,15 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer, Trai
 from datasets import Dataset
 
 if __name__ == "__main__":
-    
+        
+    X_train = pd.read_pickle("X_train.pkl")
+    X_test = pd.read_pickle("X_test.pkl")
+    y_train = pd.read_pickle("y_train.pkl")
+    y_test =pd.read_pickle("y_test.pkl")
 
-    base = "modelo_final_bueno"
+
+    #base = "modelo_final_bueno"
+    base = "microsoft/mdeberta-v3-base"
 
     tokz = AutoTokenizer.from_pretrained(
                 base, 
@@ -28,13 +34,6 @@ if __name__ == "__main__":
     def tokenize_fn(x):
         return tokz(x['input'], padding='max_length', truncation=True, max_length=256)
 
-    X_train = pd.read_pickle("X_train.pkl")
-    X_test = pd.read_pickle("X_test.pkl")
-    y_train = pd.read_pickle("y_train.pkl")
-    y_test =pd.read_pickle("y_test.pkl")
-
-    X_train['post']=X_train['post'].apply(normalize_text)
-    X_test['post']=X_test['post'].apply(normalize_text)
 
     ds_train = pd.concat([X_train, y_train],axis=1)
     ds_test = pd.concat([X_test, y_test],axis=1)

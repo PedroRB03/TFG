@@ -47,6 +47,7 @@ with open("tab_db.json", "w", encoding="utf-8") as f:
 
 
 df = pd.DataFrame(data)
+df.to_pickle("all_df.pkl")
 print(df.head())
 
 X_train, X_test, y_train, y_test = train_test_split(

@@ -133,6 +133,12 @@ Texto y Metadatos:
         MCC: 0.3613
         Balanced Accuracy: 0.5246
 
+        Post-aumento de DB, Random Sampling (n=100):
+        Macro F1: 0.4122
+        ROC-AUC (OvR): 0.705712091503268
+        MCC: 0.1871
+        Balanced Accuracy: 0.4228
+
     · LGBM
                         precision    recall  f1-score   support
 
@@ -154,16 +160,22 @@ Texto y Metadatos:
         MCC: 0.3829
         Balanced Accuracy: 0.5714
 
+        Post-aumento de DB, Random Sampling (n=100):
+        Macro F1: 0.5057
+        ROC-AUC (OvR): 0.7366592394533583
+        MCC: 0.3229
+        Balanced Accuracy: 0.5061
+
     · BERT (LGBM)
-                precision    recall  f1-score   support
+                    precision    recall  f1-score   support
 
-            0       0.67      0.67      0.67        21
-            1       0.60      0.30      0.40        10
-            2       0.53      0.75      0.62        12
+                0       0.67      0.67      0.67        21
+                1       0.60      0.30      0.40        10
+                2       0.53      0.75      0.62        12
 
-        accuracy                        0.60        43
-    macro avg       0.60      0.57      0.56        43
-    weighted avg    0.61      0.60      0.59        43
+        accuracy                            0.60        43
+        macro avg       0.60      0.57      0.56        43
+        weighted avg    0.61      0.60      0.59        43
 
     Matriz de confusión:
     [[14  2  5]
@@ -174,6 +186,12 @@ Texto y Metadatos:
     ROC-AUC (OvR): 0.7394125587673974
     MCC: 0.3748
     Balanced Accuracy: 0.5722
+
+    Post-aumento de DB, Random Sampling (n=100):
+    Macro F1: 0.4657
+    ROC-AUC (OvR): 0.6957991681521081
+    MCC: 0.2310
+    Balanced Accuracy: 0.4657
 
     · BERT (SVM)
                         precision    recall  f1-score   support
@@ -197,5 +215,40 @@ Texto y Metadatos:
         MCC: 0.1520
         Balanced Accuracy: 0.3849
 
+        Post-aumento de DB, Random Sampling (n=100):
+        Macro F1: 0.4221
+        ROC-AUC (OvR): 0.6060056149732622
+        MCC: 0.1737
+        Balanced Accuracy: 0.4338
     · BERT (FINE-TUNNING)
+                        precision    recall  f1-score   support
+
+                0       0.50      0.52      0.51        21
+                1       0.29      0.40      0.33        10
+                2       0.29      0.17      0.21        12
+
+            accuracy                        0.40        43
+        macro avg       0.36      0.36      0.35        43
+        weighted avg    0.39      0.40      0.39        43
+        Matriz de confusión:
+        [[11  6  4]
+        [ 5  4  1]
+        [ 6  4  2]]
+
+        Métricas adicionales:
+        Macro F1: 0.3518
+        ROC-AUC (OvR): 0.5225108225108225
+        MCC: 0.0394
+        Balanced Accuracy: 0.3635
         
+        Post-aumento de DB, Random Sampling (n=20):
+        Macro F1: 0.4651
+        ROC-AUC (OvR): 0.6687385992275698
+        MCC: 0.2593
+        Balanced Accuracy: 0.4732
+
+        Post-aumento de DB y slow, Random Sampling (n=20):
+        Macro F1: 0.3944
+        ROC-AUC (OvR): 0.5646498068924539
+        MCC: 0.1270
+        Balanced Accuracy: 0.4051

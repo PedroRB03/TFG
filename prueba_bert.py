@@ -128,26 +128,33 @@ X_test_final  = np.hstack([X_test_emb,  num_features_test])
 
 
 
-t = time.perf_counter()
-model.fit(X_train_final, y_train)
-print("Entrenamiento: "+str(time.perf_counter()-t))
-# --- 5. Evaluación ---
-t = time.perf_counter()
-y_pred = model.predict(X_test_final)
-print("Test: "+str(time.perf_counter()-t))
+macro_f1 = 0
+roc_auc = 0
+mcc = 0
+bal_acc = 0
+N=100
 
-print(classification_report(y_test, y_pred))
-print("Matriz de confusión:")
-print(confusion_matrix(y_test, y_pred))
+for i in range(0,N):
+    t = time.perf_counter()
+    model2.fit(X_train_final, y_train)
+    print("Entrenamiento: "+str(time.perf_counter()-t))
+    # --- 5. Evaluación ---
+    t = time.perf_counter()
+    y_pred = model2.predict(X_test_final)
+    print("Test: "+str(time.perf_counter()-t))
 
-macro_f1 = f1_score(y_test, y_pred, average='macro')
-probs = model.predict_proba(X_test_final)
-roc_auc = roc_auc_score(y_test, probs, multi_class='ovr')
-mcc = matthews_corrcoef(y_test, y_pred)
-bal_acc = balanced_accuracy_score(y_test, y_pred)
+    #print(classification_report(y_test, y_pred))
+    #print("Matriz de confusión:")
+    #print(confusion_matrix(y_test, y_pred))
+
+    macro_f1 += f1_score(y_test, y_pred, average='macro')
+    probs = model2.predict_proba(X_test_final)
+    roc_auc += roc_auc_score(y_test, probs, multi_class='ovr')
+    mcc += matthews_corrcoef(y_test, y_pred)
+    bal_acc += balanced_accuracy_score(y_test, y_pred)
 
 print("\nMétricas adicionales:")
-print(f"Macro F1: {macro_f1:.4f}")
-print(f"ROC-AUC (OvR): {roc_auc}")
-print(f"MCC: {mcc:.4f}")
-print(f"Balanced Accuracy: {bal_acc:.4f}")
+print(f"Macro F1: {macro_f1/N:.4f}")
+print(f"ROC-AUC (OvR): {roc_auc/N}")
+print(f"MCC: {mcc/N:.4f}")
+print(f"Balanced Accuracy: {bal_acc/N:.4f}")
