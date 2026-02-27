@@ -8,6 +8,7 @@ MAX_CHAR=2000
 def normalize_text(text):
         text = re.sub(r'http\S+', '[URL]', text)
         text = re.sub(r'@\w+', '[USER]', text)
+        text = re.sub(r'\!\[gif\]\(.*\)', '[URL]', text)
         return text
 
 dcc = {}
