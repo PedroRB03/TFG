@@ -1,11 +1,16 @@
 
 import pandas as pd
 import optuna
+import warnings
 import time
 from sklearn import svm
 import torch
 import numpy as np
 from sklearn.base import TransformerMixin, BaseEstimator
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn import set_config
+from sklearn.model_selection import cross_validate
 from sklearn.metrics import (
     f1_score,
     roc_auc_score,
@@ -42,7 +47,7 @@ class DebertaEmbeddings(BaseEstimator, TransformerMixin):
                 return_tensors="pt",
                 padding=True,
                 truncation=True,
-                max_length=256
+                max_length=512
             ).to(self.device)
 
             with torch.no_grad():
@@ -56,13 +61,14 @@ class DebertaEmbeddings(BaseEstimator, TransformerMixin):
 
 encoder = DebertaEmbeddings()
 
-X_train = pd.read_pickle("X_train.pkl")
-X_test = pd.read_pickle("X_test.pkl")
-y_train = pd.read_pickle("y_train.pkl")
-y_test = pd.read_pickle("y_test.pkl")
+ALL = pd.read_pickle("all_df.pkl")
 
-X_train_emb = encoder.encode(X_train["post"].astype(str).tolist())
-X_test_emb  = encoder.encode(X_test["post"].astype(str).tolist())
+X = ALL.drop(columns="ragescore")
+y = ALL["ragescore"]
+
+X_emb = encoder.encode(X["post"].astype(str).tolist())
+num_features_train = X[["upvote_ratio", "score"]].values
+X = np.hstack([X_emb, num_features_train])
 
 # --- 3. Configuramos modelo y pipeline
 model = LGBMClassifier(
@@ -88,73 +94,23 @@ model2 = svm.NuSVC(
     probability=True
 )
 
-# --- 1. Extraer numéricos
-num_features_train = X_train[["upvote_ratio", "score"]].values
-num_features_test  = X_test[["upvote_ratio", "score"]].values
+pipeline = Pipeline([
+    ('clf', model)
+])
 
-# --- 2. Concatenar los embeddings con los numéricos
-X_train_final = np.hstack([X_train_emb, num_features_train])
-X_test_final  = np.hstack([X_test_emb,  num_features_test])
 
 
 # --- 4. Separamos datos y entrenamos
 
 
-#print(pipeline.get_params().keys())
-#study = optuna.create_study(direction="maximize")
-#study.optimize(lambda trial:
-#    cross_val_score(
-#        LGBMClassifier(
-#            n_estimators=trial.suggest_int("n_estimators", 100, 800),
-#            learning_rate=trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-#            num_leaves=trial.suggest_int("num_leaves", 8, 256),
-#            max_depth=trial.suggest_int("max_depth", -1, 12),
-#            objective="multiclass",
-#            num_class=3,
-#            class_weight="balanced",
-#            subsample=trial.suggest_float("subsample", 0.5, 1.0),
-#            colsample_bytree=trial.suggest_float("colsample_bytree", 0.5, 1.0),
-#        ),
-#        X_train_emb,
-#        y_train,
-#        cv=3,
-#        scoring="f1_weighted",
-#        n_jobs=-1    # ahora sí
-#    ).mean(),
-#    n_trials=100
-#)
-#print("Mejores hiperparámetros:", study.best_params)
-#print("Mejor puntuación F1:", study.best_value)
 
 
+warnings.filterwarnings("ignore", message="X does not have valid feature names")
+scores = cross_validate(model,X,y,cv=10,scoring=["f1_macro","roc_auc_ovr","matthews_corrcoef","balanced_accuracy"])
 
-macro_f1 = 0
-roc_auc = 0
-mcc = 0
-bal_acc = 0
-N=100
 
-for i in range(0,N):
-    t = time.perf_counter()
-    model2.fit(X_train_final, y_train)
-    print("Entrenamiento: "+str(time.perf_counter()-t))
-    # --- 5. Evaluación ---
-    t = time.perf_counter()
-    y_pred = model2.predict(X_test_final)
-    print("Test: "+str(time.perf_counter()-t))
-
-    #print(classification_report(y_test, y_pred))
-    #print("Matriz de confusión:")
-    #print(confusion_matrix(y_test, y_pred))
-
-    macro_f1 += f1_score(y_test, y_pred, average='macro')
-    probs = model2.predict_proba(X_test_final)
-    roc_auc += roc_auc_score(y_test, probs, multi_class='ovr')
-    mcc += matthews_corrcoef(y_test, y_pred)
-    bal_acc += balanced_accuracy_score(y_test, y_pred)
-
-print("\nMétricas adicionales:")
-print(f"Macro F1: {macro_f1/N:.4f}")
-print(f"ROC-AUC (OvR): {roc_auc/N}")
-print(f"MCC: {mcc/N:.4f}")
-print(f"Balanced Accuracy: {bal_acc/N:.4f}")
+print(scores)
+print("MEANS:")
+for key, values in scores.items():
+    if key.startswith("test_"):
+        print(f"{key}: {np.mean(values):.4f}")
