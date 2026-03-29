@@ -36,9 +36,9 @@ with open('ragebait.csv','w',encoding='utf-8') as f:
         rb = [row[1].value,row[2].value,row[3].value].count("Trolling")
         if len(txt) > 0:
             writer.writerow([txt, rb])
-        if rb == "Ragebait":
+        if rb in [0,3]:
             data['text'].append(txt)
-            data['ragescore'].append(rb)
+            data['ragescore'].append(-1 if rb == 0 else 1)
         if n >= N:
             break
 
