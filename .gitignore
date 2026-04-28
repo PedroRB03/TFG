@@ -3,6 +3,8 @@ old/transformers
 .env
 old/.env
 .venv
+.vscode
+.conda
 old/bert_ft_opt
 old/modelo_final
 old/modelo_final_metad

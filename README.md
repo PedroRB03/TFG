@@ -10,6 +10,7 @@ Cabe destacar los siguientes archivos de interés:
 - prueba_lgbm.py : Permite evaluar con KCrossValidation o buscar hiperparámetros del modelo LGBM con los datos de 'rb_db.pkl' generados por filtrado.py.
 - prueba_svm.py : Permite evaluar con KCrossValidation o buscar hiperparámetros del modelo SVM con los datos de 'rb_db.pkl' generados por filtrado.py.
 - prueba_bert.py : Permite evaluar con KCrossValidation el modelo Microsoft/DeBERTaV3-base con los datos de 'rb_db.pkl' generados por filtrado.py.
+- requirements.txt : Requisitos de paquetes para python. Es posible que hayan más paquetes de los necesarios, si lo prefiere, instale solo los paquetes que necesite cada archivo. 
 
 Los archivos de python suelen tener la declaración de algunos parámetros al principio de estos. Dichos parámetros suelen controlar la seed o las rutas de los archivos requeridos.
 
