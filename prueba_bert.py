@@ -1,116 +1,100 @@
-
 import pandas as pd
-import optuna
-import warnings
-import time
-from sklearn import svm
-import torch
+from datasets import Dataset
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer, EarlyStoppingCallback, set_seed
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
 import numpy as np
-from sklearn.base import TransformerMixin, BaseEstimator
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn import set_config
-from sklearn.model_selection import cross_validate
-from sklearn.metrics import (
-    f1_score,
-    roc_auc_score,
-    matthews_corrcoef,
-    balanced_accuracy_score,
-    classification_report, 
-    confusion_matrix
-)
-from transformers import AutoTokenizer, AutoModel
-from lightgbm import LGBMClassifier
+from sklearn.metrics import (f1_score, balanced_accuracy_score, 
+                             matthews_corrcoef, roc_auc_score)
+from scipy.special import softmax
 
 
-torch.backends.cudnn.benchmark = True
+## PARÁMETROS
+RANDOM_STATE = 42
+FILE = "rb_db.pkl"
+##
 
-class DebertaEmbeddings(BaseEstimator, TransformerMixin):
-    def __init__(self, model_name="microsoft/mdeberta-v3-base", device=None,batch_size=32):
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.batch_size = batch_size
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
-        self.model = AutoModel.from_pretrained(model_name)
-        self.model.to(self.device)
-        self.model.eval()
+df = pd.read_pickle(FILE)
+set_seed(RANDOM_STATE)
 
-        torch.backends.cudnn.benchmark = True
+results = [] # Resultados del CV
 
-    def encode(self, texts):
-        embs = []
+model_name = "microsoft/mdeberta-v3-base"
+tokenizer = AutoTokenizer.from_pretrained(model_name,
+                                            use_fast=True,
+                                            extra_special_tokens=['[URL]','[USER]']
+                                            )
 
-        for i in range(0, len(texts), self.batch_size):
-            batch = texts[i:i+self.batch_size]
+# Tokenizador
+def tokenize_function(examples):
+    return tokenizer(examples["txt"], padding="max_length", truncation=True, max_length=256)
 
-            inputs = self.tokenizer(
-                batch,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-                max_length=512
-            ).to(self.device)
+# Métricas a mostrar durante el entrenamiento
+def compute_metrics(eval_pred):
+    logits, labels = eval_pred
 
-            with torch.no_grad():
-                out = self.model(**inputs)
+    probs = softmax(logits, axis=-1)
+    predictions = np.argmax(logits, axis=-1)
+    
+    roc_auc = roc_auc_score(labels, probs[:, 1]) 
+    
+    return {
+        'macro_f1': f1_score(labels, predictions, average='macro'),
+        'balanced_accuracy': balanced_accuracy_score(labels, predictions),
+        'matthews_corrcoef': matthews_corrcoef(labels, predictions),
+        'roc_auc_ovr': roc_auc
+    }
 
-            cls_batch = out.last_hidden_state[:, 0, :].cpu().numpy()
-            embs.append(cls_batch)
+# Obtenemos folds
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
 
-        return np.vstack(embs)
+# Por cada fold
+for fold, (train_idx, val_idx) in enumerate(skf.split(df['txt'], df['label'])):
+    print(f"\n--- Entrenando Fold {fold + 1} ---")
+    
+    train_ds = Dataset.from_pandas(df.iloc[train_idx][['txt', 'label']])
+    val_ds = Dataset.from_pandas(df.iloc[val_idx][['txt', 'label']])
+    
+    tokenized_train = train_ds.map(tokenize_function, batched=True)
+    tokenized_val = val_ds.map(tokenize_function, batched=True)
 
+    model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+    model.resize_token_embeddings(len(tokenizer))
+    
+    # Hiperparámetros
+    training_args = TrainingArguments(
+        #output_dir=f"./resultados_fold_{fold}",
+        eval_strategy='epoch',
+        save_strategy='no',
+        per_device_train_batch_size=32,
+        per_device_eval_batch_size=32,
+        learning_rate=2e-6,
+        num_train_epochs=3,
+        warmup_steps=300,
+        weight_decay=0.01,
+        logging_steps=100,
+        seed=42
+    )
 
-encoder = DebertaEmbeddings()
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_train,
+        eval_dataset=tokenized_val,
+        compute_metrics=compute_metrics,
+    )
 
-ALL = pd.read_pickle("all_df.pkl")
+    trainer.train()
+    
+    eval_stats = trainer.evaluate()
+    results.append(eval_stats)
 
-X = ALL.drop(columns="ragescore")
-y = ALL["ragescore"]
+# Hacemos print de resultados finales
+print("\n" + "="*30)
+print("RESULTADOS FINALES CV")
+print("="*30)
 
-X_emb = encoder.encode(X["post"].astype(str).tolist())
-num_features_train = X[["upvote_ratio", "score"]].values
-X = np.hstack([X_emb, num_features_train])
-
-# --- 3. Configuramos modelo y pipeline
-model = LGBMClassifier(
-    n_estimators=182,
-    learning_rate=0.06,
-    subsample=0.5939,
-    min_child_samples=30,
-    num_leaves=2,
-    force_col_wise=True,
-    colsample_bytree=0.962,
-    class_weight='balanced',
-    objective='multiclass',
-    num_class=3,
-    max_depth=1
-)
-
-model2 = svm.NuSVC(
-    nu=.5,
-    decision_function_shape="ovr",
-    class_weight='balanced',
-    break_ties=True,
-    gamma=0.45,
-    probability=True
-)
-
-pipeline = Pipeline([
-    ('clf', model)
-])
-
-
-
-# --- 4. Separamos datos y entrenamos
-
-
-
-
-warnings.filterwarnings("ignore", message="X does not have valid feature names")
-scores = cross_validate(model,X,y,cv=10,scoring=["f1_macro","roc_auc_ovr","matthews_corrcoef","balanced_accuracy"])
-
-
-print(scores)
-print("MEANS:")
-for key, values in scores.items():
-    if key.startswith("test_"):
-        print(f"{key}: {np.mean(values):.4f}")
+metric_names = ['eval_macro_f1', 'eval_balanced_accuracy', 'eval_matthews_corrcoef', 'eval_roc_auc_ovr']
+for m in metric_names:
+    values = [r[m] for r in results]
+    print(f"{m[5:]}: {np.mean(values):.4f} (+/- {np.std(values):.4f})")
