@@ -10,3 +10,9 @@ X_test.pkl
 X_train.pkl
 y_test.pkl
 y_train.pkl
+trolling/resultados_deberta
+trolling/resultados_fold_0
+trolling/resultados_fold_1
+trolling/resultados_fold_2
+trolling/resultados_fold_3
+trolling/resultados_fold_4

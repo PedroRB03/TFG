@@ -7,19 +7,19 @@ import pandas as pd
 def normalize_text(text):
         text = re.sub(r'(\[.*\]\(.*\))|(<URL>)|(http[^\s]+)|(https[^\s]+)', '[URL]', text)
         text = re.sub(r'(@\w+)|(<USER>)', '[USER]', text)
-        text = re.sub(r'(\<b\>)|(\<b\\\/\>)|\[removed\]','', text)
+        text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)|\[removed\]','', text)
         return text
 
 
 data = {
-    "text" : [],
-    "ragescore" : [],
+    "txt" : [],
+    "label" : [],
 }
 
 with open('ragebait.csv','w',encoding='utf-8') as f:
 
     writer = csv.writer(f,quoting=csv.QUOTE_ALL)
-    writer.writerow(['text','ragescore'])
+    writer.writerow(['txt','label'])
 
     wb = openpyxl.load_workbook('trolling.xlsx')
     sheet = wb.active
@@ -37,11 +37,12 @@ with open('ragebait.csv','w',encoding='utf-8') as f:
         if len(txt) > 0:
             writer.writerow([txt, rb])
         if rb in [0,3]:
-            data['text'].append(txt)
-            data['ragescore'].append(-1 if rb == 0 else 1)
+            data['txt'].append(txt)
+            data['label'].append(0 if rb == 0 else 1)
         if n >= N:
             break
 
 df = pd.DataFrame(data)
+df = df.sample(frac=1).reset_index(drop=True)
 df.to_pickle("rb_db.pkl")
 print(df.head())
