@@ -1,26 +1,25 @@
 import pandas as pd
 import optuna
-from sklearn.model_selection import cross_validate, cross_val_score
-from transformers import set_seed
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.metrics import roc_auc_score, f1_score,balanced_accuracy_score, matthews_corrcoef
 from lightgbm import LGBMClassifier
 import warnings
 import numpy as np
 
 
 ## PARÁMETROS
-OPTIMIZAR = False # Dejar en False si no se quieren buscar hiperparámetros
-RANDOM_STATE = 42
-CV = 5 # Folds para Cross Validation
-FILE = "rb_db.pkl"
+OPT_TIME = 0 # Dejar en 0 si no se quieren buscar hiperparámetros
+OPT_STUDY = "lgbm-study" # nombre del estudio de optuna
+OPT_DB = "sqlite:///lgbm-study.db" # nombre de la base de datos con estudio
+SEEDS = [600,601,602,603,604] # semillas que se usarán
+FILE = "pkls/rb_db" # prefijo de archivos a usar
 ##
 
-set_seed(RANDOM_STATE)
-
+## PIPELINE
 tfidf_p = TfidfVectorizer( # Vectorizador
-    ngram_range=(1,3),    
+    #ngram_range=(1,3),    
     stop_words="english",
     lowercase=True
 )
@@ -33,23 +32,45 @@ preprocessor = ColumnTransformer(
 )
 
 model = LGBMClassifier( # Hiperparámetros
-    n_estimators=924,
-    learning_rate=0.10070282202088496,
-    subsample=0.4030040988322811,
-    min_child_samples=5,
-    num_leaves=21,
-    colsample_bytree=0.5922499111669536,
-    #class_weight='balanced',
+    #n_estimators=924,
+    #learning_rate=0.10070282202088496,
+    #subsample=0.4030040988322811,
+    #min_child_samples=5,
+    #num_leaves=21,
+    #colsample_bytree=0.5922499111669536,
+    #max_depth=6,
     objective='binary',
-    #num_class=2,
-    max_depth=6,
     verbose=-1
 )
 
 pipeline = Pipeline([
     ('prepro', preprocessor), # vectorización
     ('clf', model) # clasificador
-])
+]) 
+##
+
+# Función para calcular métricas
+def compute_metrics(y_test,y_pred):
+    return {
+        'macro_f1': f1_score(y_test, y_pred, average='macro'),
+        'balanced_accuracy': balanced_accuracy_score(y_test, y_pred),
+        'matthews_corrcoef': matthews_corrcoef(y_test, y_pred),
+        'roc_auc_ovr': roc_auc_score(y_test, y_pred)
+    }
+
+# Función para obtener métricas de las semillas
+def get_results(file,seeds):
+    results = []
+
+    for seed in seeds:
+        train_ds = pd.read_pickle(file+str(seed)+"train.pkl")
+        test_ds = pd.read_pickle(file+str(seed)+"test.pkl")
+        pipeline.fit(train_ds.drop(columns="label"),train_ds["label"])
+        y_pred = pipeline.predict(test_ds.drop(columns="label"))
+        
+        results.append(compute_metrics(test_ds["label"],y_pred))
+
+    return results
 
 # Función para buscar hiperparámetros
 def objective(trial):
@@ -67,33 +88,44 @@ def objective(trial):
     }
 
     pipeline.set_params(**param_grid)
+    results = get_results(FILE,SEEDS)
 
-    score = cross_val_score(pipeline, X, y, cv=5, scoring='f1_macro', n_jobs=-1)
-    
-    return score.mean()
+    values = [r["macro_f1"] for r in results]
+
+    return np.mean(values)
 
 
-ALL = pd.read_pickle(FILE)
-
-X = ALL.drop(columns="label")
-y = ALL["label"]
-#print(y.nunique())
 
 warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
-if OPTIMIZAR:
-    study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=50)
+# se obtiene o crea estudio a partir de base de datos sqllite
+study = optuna.create_study(direction='maximize',study_name=OPT_STUDY,storage=OPT_DB,load_if_exists=True) 
+
+if OPT_TIME > 0: # si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos
+    study.optimize(objective, timeout=OPT_TIME)
 
     print("--- MEJORES PARÁMETROS ---")
     print(study.best_params)
     print(f"Mejor F1-Macro: {study.best_value:.4f}")
-else:
-    scores = cross_validate(pipeline,X,y,cv=CV,scoring=["f1_macro","roc_auc_ovr","matthews_corrcoef","balanced_accuracy"]) # Cross Val.
+else: # si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
 
+    max_n = study.best_params['prepro__post_tfidf__ngram_range_max'] 
+    min_n = study.best_params['prepro__post_tfidf__ngram_range_min']
 
-    print(scores)
-    print("MEANS:") # Print de media de los folds
-    for key, values in scores.items():
-        if key.startswith("test_"):
-            print(f"{key}: {np.mean(values):.4f}")
+    param_grid = study.best_params # copiamos parámetros desde estudio
+    param_grid.pop('prepro__post_tfidf__ngram_range_max') # max y min no existen realmente en tfidf, los quitamos
+    param_grid.pop('prepro__post_tfidf__ngram_range_min')
+    
+    param_grid['prepro__post_tfidf__ngram_range'] = (min_n, max_n)
+
+    pipeline.set_params(**param_grid) # cargamos mejores parámetros
+    results = get_results(FILE,SEEDS)
+    
+    print("\n" + "="*30)
+    print("RESULTADOS FINALES")
+    print("="*30)
+
+    metric_names = ['macro_f1', 'balanced_accuracy', 'matthews_corrcoef', 'roc_auc_ovr']
+    for m in metric_names:
+        values = [r[m] for r in results]
+        print(f"{m}: {np.mean(values):.4f} (+/- {np.std(values):.4f})")

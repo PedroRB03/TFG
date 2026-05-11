@@ -2,17 +2,19 @@ import openpyxl
 import math
 import re
 import pandas as pd
-from transformers import set_seed
+from sklearn.model_selection import train_test_split
 
 ## PARÁMETROS
-RANDOM_STATE = 42
+SEEDS = [600,601,602,603,604]
+TEST_PERCENT = 15
+EVAL_PERCENT = 15
 FILE = 'trolling.xlsx'
-OUT_FILE = "rb_db.pkl"
-OUT_FILE_F = "rbf_db.pkl"
+OUT_FILE = "pkls/rb_db"
+OUT_FILE_F = "pkls/rbf_db"
 N = math.inf # Límite de filas a incluir, infinito por ahora
+VERBOSE = False # Mostrar los primeros elementos de cada archivo
 ##
 
-set_seed(RANDOM_STATE)
 
 
 # Función de normalización de texto
@@ -77,17 +79,58 @@ def subsample(df):
     for i,c in enumerate(df_classes):
          df_classes[i] = c.iloc[:c_min]
 
-    df = pd.concat(df_classes)
-    df = df.sample(frac=1).reset_index(drop=True) # shuffle
+    df = pd.concat(df_classes).reset_index(drop=True)
     return df
 
-# Lo pasamos a dataframe
-df = pd.DataFrame(data)
-df = subsample(df)
-df.to_pickle(OUT_FILE)
-print(df.head())
+# Separa datos en tres subconjuntos: entrenamiento, evaluación y test.
+def make_df(df,test_size,eval_size,seed=1):
+    #df = pd.DataFrame(data)
+    #df = df.drop_duplicates(subset=['txt'])
+    #df = subsample(df)
+    df_train, df_testeval = train_test_split(df, test_size=test_size/100+eval_size/100, stratify=df['label'], random_state=seed)
+    df_eval, df_test = train_test_split(df_testeval, test_size=test_size/(test_size+eval_size), stratify=df_testeval['label'], random_state=seed)
+    return df_train, df_eval, df_test
 
+# Creamos dataframes sin barajar 
+df = pd.DataFrame(data)
+df = df.drop_duplicates(subset=['txt']) # quitamos duplicados
+df = subsample(df)
 dff = pd.DataFrame(data_f)
+dff = dff.drop_duplicates(subset=['txt']) # quitamos duplicados
 dff = subsample(dff)
-dff.to_pickle(OUT_FILE_F)
-print(dff.head())
+
+# Por cada semilla creamos archivos de train, eval y test para crisp y fuzzy.
+for seed in SEEDS:
+    if VERBOSE:
+        print("SEED: "+str(seed))
+
+        print("CRISP")
+    df_tr, df_ev,df_tst = make_df(df,TEST_PERCENT,EVAL_PERCENT,seed)
+    if VERBOSE:
+        print(f"TRAIN \n{df_tr.head()}")
+        print(f"EVAL \n{df_ev.head()}")
+        print(f"TEST \n{df_tst.head()}")
+    df_tr.to_pickle(OUT_FILE+str(seed)+"train.pkl")
+    df_ev.to_pickle(OUT_FILE+str(seed)+"eval.pkl")
+    df_tst.to_pickle(OUT_FILE+str(seed)+"test.pkl")
+
+    #if len(set(df_tr["txt"]).intersection(set(df_ev["txt"]))) > 0 or len(set(df_tst["txt"]).intersection(set(df_ev["txt"]))) > 0:
+    #    print("Hay elementos comunes en los datasets...")
+    #    break
+
+    if VERBOSE:
+        print("FUZZY")
+    dff_tr, dff_ev,dff_tst = make_df(dff,TEST_PERCENT,EVAL_PERCENT,seed)
+    if VERBOSE:
+        print(f"\nTRAIN \n{dff_tr.head()}")
+        print(f"\nEVAL \n{dff_ev.head()}")
+        print(f"\nTEST \n{dff_tst.head()}")
+    dff_tr.to_pickle(OUT_FILE_F+str(seed)+"train.pkl")
+    dff_ev.to_pickle(OUT_FILE_F+str(seed)+"eval.pkl")
+    dff_tst.to_pickle(OUT_FILE_F+str(seed)+"test.pkl")
+
+    #if len(set(dff_tr["txt"]).intersection(set(dff_ev["txt"]))) > 0 or len(set(dff_tst["txt"]).intersection(set(dff_ev["txt"]))) > 0:
+    #    print("Hay elementos comunes en los datasets...")
+    #    break
+
+

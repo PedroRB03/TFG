@@ -1,8 +1,6 @@
 import pandas as pd
 from datasets import Dataset
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer, EarlyStoppingCallback, set_seed
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer, EarlyStoppingCallback
 import numpy as np
 from sklearn.metrics import (f1_score, balanced_accuracy_score, 
                              matthews_corrcoef, roc_auc_score)
@@ -10,18 +8,14 @@ from scipy.special import softmax
 
 
 ## PARÁMETROS
-RANDOM_STATE = 42
-FILE = "rbf_db.pkl"
-FUZZY = True
-EARLY_STOP = 1 
+SEEDS = [600,601,602,603,604] # semillas que se usarán
+FILE = "pkls/rbf_db" # prefijo de archivos a usar
+FUZZY = True # Cambia de clasificación a regresión si está en True
+EARLY_STOP = 1 # Paciencia del early stopping
 ##
 
-df = pd.read_pickle(FILE)
-#df = df.iloc[:1000] # Nos quedamos con los primeros 1000 ejemplares
 
-set_seed(RANDOM_STATE)
-
-results = [] # Resultados del CV
+results = [] # Resultados de cada seed
 
 model_name = "microsoft/mdeberta-v3-base"
 tokenizer = AutoTokenizer.from_pretrained(model_name,
@@ -29,11 +23,10 @@ tokenizer = AutoTokenizer.from_pretrained(model_name,
                                             extra_special_tokens=['[URL]','[USER]']
                                             )
 
-# Tokenizador
 def tokenize_function(examples):
     return tokenizer(examples["txt"], padding="max_length", truncation=True, max_length=256)
 
-# Métricas a mostrar durante el entrenamiento
+# Función para calcular métricas
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
 
@@ -56,18 +49,17 @@ def compute_metrics(eval_pred):
         'roc_auc_ovr': roc_auc
     }
 
-# Obtenemos folds
-skf = KFold(n_splits=5)
 
-# Por cada fold
-for fold, (train_idx, val_idx) in enumerate(skf.split(df)):
-    print(f"\n--- Entrenando Fold {fold + 1} ---")
+for seed in SEEDS:
+    print(f"\n--- Entrenando Seed {seed} ---")
     
-    train_ds = Dataset.from_pandas(df.iloc[train_idx][['txt', 'label']])
-    val_ds = Dataset.from_pandas(df.iloc[val_idx][['txt', 'label']])
+    train_ds = Dataset.from_pandas(pd.read_pickle(FILE+str(seed)+"train.pkl"))
+    eval_ds = Dataset.from_pandas(pd.read_pickle(FILE+str(seed)+"eval.pkl"))
+    test_ds = Dataset.from_pandas(pd.read_pickle(FILE+str(seed)+"test.pkl"))
     
-    tokenized_train = train_ds.map(tokenize_function, batched=True)
-    tokenized_val = val_ds.map(tokenize_function, batched=True)
+    t_train = train_ds.map(tokenize_function, batched=True)
+    t_eval = eval_ds.map(tokenize_function, batched=True)
+    t_test = test_ds.map(tokenize_function, batched=True)
 
     if FUZZY:
         model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=1)
@@ -77,7 +69,7 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(df)):
     
     # Hiperparámetros
     training_args = TrainingArguments(
-        #output_dir=f"./resultados_fold_{fold}",
+        #output_dir=f"./resultados_fold_{seed}",
         eval_strategy='epoch',
         save_strategy='no',
         per_device_train_batch_size=32,
@@ -87,36 +79,37 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(df)):
         warmup_steps=900,
         weight_decay=0.01,
         logging_steps=100,
-        seed=42,
-        metric_for_best_model='macro_f1'
+        seed=seed,
+        metric_for_best_model='macro_f1',
+        load_best_model_at_end=True,
     )
 
-    if EARLY_STOP == 0:
+    if EARLY_STOP == 0: # Si EARLY_STOP es cero, no incluimos el callback
         trainer = Trainer(
             model=model,
             args=training_args,
-            train_dataset=tokenized_train,
-            eval_dataset=tokenized_val,
+            train_dataset=t_train,
+            eval_dataset=t_eval,
             compute_metrics=compute_metrics,
         )
     else:
         trainer = Trainer(
             model=model,
             args=training_args,
-            train_dataset=tokenized_train,
-            eval_dataset=tokenized_val,
+            train_dataset=t_train,
+            eval_dataset=t_eval,
             compute_metrics=compute_metrics,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=EARLY_STOP)] # Incluimos early stopping si no es 0
         )
 
     trainer.train()
     
-    eval_stats = trainer.evaluate()
+    eval_stats = trainer.evaluate(eval_dataset=t_test)
     results.append(eval_stats)
 
 # Hacemos print de resultados finales
 print("\n" + "="*30)
-print("RESULTADOS FINALES CV")
+print("RESULTADOS FINALES")
 print("="*30)
 
 metric_names = ['eval_macro_f1', 'eval_balanced_accuracy', 'eval_matthews_corrcoef', 'eval_roc_auc_ovr']
