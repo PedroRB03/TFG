@@ -7,6 +7,7 @@ from sklearn.metrics import (f1_score, balanced_accuracy_score,
                              matthews_corrcoef, roc_auc_score)
 from scipy.special import softmax
 import torch
+from common import balance
 
 ## PARÁMETROS
 SEEDS = [600,601,602,603,604] # semillas que se usarán
@@ -15,7 +16,7 @@ FILE_F = "data/pkls/fuzzy/rbf_db" # prefijo de archivos a usar si FUZZY = True
 RESULTS = "data/bert_results" # donde guardar mejores modelos
 FUZZY = True # Cambia de clasificación a regresión si está en True
 EARLY_STOP = 3 # Paciencia del early stopping
-BALANCING = "RUS" # Puede ser None (Ninguna ténica de balanceo), RUS (RandomUnderSampler), ENN (EditedNearestNeighbours) o SMOTE
+BALANCING = "RUS" # Puede ser None (Ninguna ténica de balanceo), RUS (RandomUnderSampler) o ENN (EditedNearestNeighbours) (No usar SMOTE)
 ##
 
 
@@ -71,6 +72,12 @@ for seed in SEEDS:
     t_eval = eval_ds.map(tokenize_function, batched=True)
     t_test = test_ds.map(tokenize_function, batched=True)
 
+    if BALANCING is not None and BALANCING != "SMOTE":
+        idxs = np.arange(len(t_train)).reshape(-1, 1)
+        labels = np.array(t_train["label"])
+        new_idx,_ = balance(idxs,labels,BALANCING,seed)
+        new_idx = new_idx.flatten()
+        t_train = t_train.select(new_idx)
 
     if FUZZY:
         model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=1,torch_dtype=torch.float32)
