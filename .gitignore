@@ -6,3 +6,4 @@ data/pkls/crisp/*
 data/pkls/fuzzy/*
 src/__pycache__
 data/bert_results/*
+results/*

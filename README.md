@@ -1,20 +1,24 @@
 
 # TFG - Detección de ragebait/trolling
 
-En este proyecto se encuentran los ficheros relacionados con el TFG
+En este repositorio se encuentran los ficheros relacionados con el TFG
 de detección de ragebait/trolling.
 
-Cabe destacar los siguientes archivos de interés:
-- data/trolling.xlsx : Es el dataset de trolling. 
-- src/datagen.py : Toma el archivo 'trolling.xlsx' y genera archivos de entrenamiento, evaluación y test por cada semilla configurada. Genera dos versiones de archivos por semilla, uno para lógica crisp (es decir, con etiqueta a 0 o 1) y otra para lógica fuzzy (etiquetas en el intervalo \[0,1\]).
-- src/lgbm.py : Permite evaluar el modelo o buscar hiperparámetros del modelo LGBM con los datos de 'rb_db' generados por datagen.py.
-- src/svm.py : Permite evaluar el modelo o buscar hiperparámetros del modelo SVM con los datos de 'rb_db' generados por datagen.py.
-- src/bert.py : Permite evaluar el modelo Microsoft/DeBERTaV3-base con los datos de 'rb_db' o 'rbf_db' (si es fuzzy) generados por datagen.py.
+El proyecto sigue la siguiente estructura:
+- data: contiene archivos relacionados con el dataset.
+    - pkls: carpeta que contiene archivos ".pkl".
+        - crisp: contiene datos de entrenamiento, evaluación y test CRISP para cada semilla.
+        - fuzzy: contiene datos de entrenamiento, evaluación y test FUZZY para cada semilla.
+    - trolling.xlsx: dataset original.
+- results: contiene modelos entrenados y otros archivos generados.
+- src: contiene los scripts de Python para el uso y entrenamiento de los distintos modelos.
+    - datagen.py: permite generar los archivos de datos preprocesados para el uso de los modelos. Adicionalmente, guarda el modelo TF-IDF entrenado.
+    - common.py: contiene funciones de uso general además de entrenamiento para modelos LGBM y SVM.
+    - lgbm.py: script para el uso, guardado o búsqueda de hiperparámetros del modelo LGBM.
+    - svm.py: script para el uso, guardado o búsqueda de hiperparámetros del modelo SVM.
+    - bertcore.py: contiene funciones para el entrenamiento, test y guardado de modelos mDeBERTaV3.
+    - bert.py: script para el uso, guardado o búsqueda de hiperparámetros del modelo mDeBERTaV3.
 - requirements.txt : Requisitos de paquetes para python. Es posible que hayan más paquetes de los necesarios, si lo prefiere, instale solo los paquetes que necesite cada archivo. 
+- params.ini: Archivo de configuración de las distintas scripts.
 
-Los archivos de Python suelen tener la declaración de algunos parámetros al principio de estos. Dichos parámetros suelen controlar las seeds o las rutas de los archivos requeridos.
-
-En la carpeta "data" se encuentran los datasets usados en los modelos.
-Por otro lado en "results" se encuentran los resultados del entrenamiento de los respectivos modelos.
-
-La carpeta Old se puede ignorar y todo commit previo a su creación.
+La carpeta "old" se puede ignorar y todo commit previo a su creación.
