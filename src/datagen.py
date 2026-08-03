@@ -17,6 +17,7 @@ if __name__ == "__main__":
     SEEDS = params["COMMON"]["SEEDS"]
     TEST_PERCENT = params["DATAGEN"]["TEST_PERCENT"]
     EVAL_PERCENT = params["DATAGEN"]["EVAL_PERCENT"]
+    FUZZY_BAL_CRISP = params["COMMON"]["FUZZY_BAL_CRISP"]
     FILE = params["DATAGEN"]["FILE"]
     VFILE = params["COMMON"]["VFILE"]
     OUT_FILE = params["COMMON"]["FILE"]
@@ -29,12 +30,12 @@ if __name__ == "__main__":
     NGRAM_MAX = params["DATAGEN"]["NGRAM_MAX"]
     ##
 
-    data = {
+    data = { # datos crisp
         "txt" : [],
         "label" : [],
     }
 
-    data_f = {
+    data_f = { # datos fuzzy
         "txt" : [],
         "label" : [],
     }
@@ -85,24 +86,20 @@ if __name__ == "__main__":
 
         return df_train, df_eval, df_test
 
-    # no usada, quitar en versión final
-    def remNcheckDupes(df):
-        print(f"Duplicados CRISP normalizado: {len(df['txt'])-len(df['txt'].drop_duplicates())}")
-        df = df.drop_duplicates(subset=['txt']) # quitamos duplicados
-        print(f"Duplicados CRISP barajado: {len(df['txt'])-len(df['txt'].drop_duplicates())}")
-
     def distnel(l1,l2):
         return len(set(l1).intersection(set(l2))) > 0 
 
     # Creamos dataframes
     df = pd.DataFrame(data)
-    df = df.drop_duplicates(subset=['txt']) # quitamos duplicados
+    df = df.drop_duplicates(subset=['txt']) # Quitamos duplicados
 
 
     dff = pd.DataFrame(data_f)
-    dff = dff.drop_duplicates(subset=['txt']) # quitamos duplicados
+    dff = dff.drop_duplicates(subset=['txt']) # Quitamos duplicados
 
-    dfs = [df, dff]
+
+    
+    dfs = [df, dff] 
     tfidfs = ["/tfidf_crisp","/tfidf_fuzzy"]
     filepaths = [OUT_FILE+"/rb_db",OUT_FILE_F+"/rbf_db"]
     titles = ["CRISP","FUZZY"]
@@ -111,7 +108,7 @@ if __name__ == "__main__":
     for seed in SEEDS:
         print("SEED: "+str(seed))
 
-        for i in range(0,len(dfs)):
+        for i in range(0,len(dfs)): # i = 0 cuando CRISP, i = 1 cuando FUZZY
             df_i = dfs[i]
             f_path = filepaths[i]
             tfidfp = tfidfs[i]
@@ -131,13 +128,14 @@ if __name__ == "__main__":
             df_ev['vec'] = [vec_ev.getrow(i) for i in range(vec_ev.shape[0])]
             df_tst['vec'] = [vec_tst.getrow(i) for i in range(vec_tst.shape[0])]
 
-            if BALANCING is not None and BALANCING != "None" and BALANCING != "":
-                df_tr = balance(df_tr,BALANCING,seed)
+            if BALANCING is not None and BALANCING != "None" and BALANCING != "": # Balanceamos si BALANCING no es None
+                df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=FUZZY_BAL_CRISP)
                 
             if VERBOSE:
-                print(f"TRAIN \n{df_tr.head()}")
-                print(f"EVAL \n{df_ev.head()}")
-                print(f"TEST \n{df_tst.head()}")
+                print(f"TRAIN \n{df_tr.tail()}")
+                print(f"EVAL \n{df_ev.tail()}")
+                print(f"TEST \n{df_tst.tail()}")
+                
             df_tr.to_pickle(f_path+str(seed)+"train.pkl")
             df_ev.to_pickle(f_path+str(seed)+"eval.pkl")
             df_tst.to_pickle(f_path+str(seed)+"test.pkl")

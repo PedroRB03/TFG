@@ -22,3 +22,9 @@ def make_pipeline(model):
         ('clf', model) # Clasificador
     ]) 
     return pipeline
+
+# no usada, quitar en versión final
+def remNcheckDupes(df):
+    print(f"Duplicados CRISP normalizado: {len(df['txt'])-len(df['txt'].drop_duplicates())}")
+    df = df.drop_duplicates(subset=['txt']) # Quitamos duplicados
+    print(f"Duplicados CRISP barajado: {len(df['txt'])-len(df['txt'].drop_duplicates())}")

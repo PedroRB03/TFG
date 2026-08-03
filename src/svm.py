@@ -29,8 +29,6 @@ if __name__ == "__main__":
 
     # Función para buscar hiperparámetros
     def objective(trial):
-        #max_n = trial.suggest_int('pre__tfidf__ngram_range_max', 2, 5)
-        #min_n = trial.suggest_int('pre__tfidf__ngram_range_min', 1, 2)
         kernel = trial.suggest_categorical('kernel', ['linear', 'rbf', 'poly'])
 
         param_grid = {
@@ -59,7 +57,7 @@ if __name__ == "__main__":
         optimize(study,objective,OPT_TIME)
     else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
         models = test_study(study,model,FILE,SEEDS,USE_TEST)
-        if SAVE_MODEL:
+        if SAVE_MODEL: # Guardar modelo
             print("Guardando modelo SVM...")
             for seed in SEEDS:
                 Path(MODEL_PATH).mkdir(parents=True, exist_ok=True)

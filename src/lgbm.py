@@ -23,13 +23,11 @@ if __name__ == "__main__":
 
     model = LGBMClassifier(
             objective='binary',
-            verbose=-1
+            verbose=-1,
         )
 
     # Función para buscar hiperparámetros
     def objective(trial):
-        #max_n = trial.suggest_int('pre__tfidf__ngram_range_max', 2, 5)
-        #min_n = trial.suggest_int('pre__tfidf__ngram_range_min', 1, 2)
 
         param_grid = {
             'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
@@ -49,7 +47,7 @@ if __name__ == "__main__":
         return np.mean(values)
 
 
-    warnings.filterwarnings("ignore", message="X does not have valid feature names")
+    warnings.filterwarnings("ignore", message="X does not have valid feature names") # Filtra advertencias
 
     # Se obtiene o crea estudio a partir de base de datos sqllite
     study = optuna.create_study(direction='maximize',study_name=OPT_STUDY,storage=OPT_DB,load_if_exists=True) 
@@ -58,7 +56,7 @@ if __name__ == "__main__":
         optimize(study,objective,OPT_TIME)
     else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
         models = test_study(study,model,FILE,SEEDS,USE_TEST)
-        if SAVE_MODEL:
+        if SAVE_MODEL: # Guardar modelo
             print("Guardando modelo LGBM...")
             for seed in SEEDS:
                 Path(MODEL_PATH).mkdir(parents=True, exist_ok=True)

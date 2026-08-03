@@ -3,6 +3,7 @@ import numpy as np
 from common import optimize, get_params
 from bertcore import *
 import sys
+from transformers.utils import logging as hf_logging
 
 if __name__ == "__main__":
    
@@ -19,12 +20,15 @@ if __name__ == "__main__":
     EARLY_STOP = params["BERT"]["EARLY_STOP"]
     USE_TEST = params["BERT"]["USE_TEST"]
     SAVE_MODEL = params["BERT"]["SAVE_MODEL"]
+    BALANCED_CW = params["BERT"]["BALANCED_CW"]
+    SHOW_LOAD_REPORT = params["BERT"]["SHOW_LOAD_REPORT"]
+    FUZZY_BAL_CRISP = params["COMMON"]["FUZZY_BAL_CRISP"]
     ##
    
 
 
-
-    u_file = FILE
+    # Calculamos ruta de los datos a usar en función del parámetro FUZZY
+    u_file = FILE 
     if FUZZY:
         u_file = FILE_F
 
@@ -38,15 +42,14 @@ if __name__ == "__main__":
             'weight_decay' : trial.suggest_int("weight_decay", 0.01 , 0.1),
         }
 
-        results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST=False)
+        results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,False,BALANCED_CW,FUZZY_BAL_CRISP)
         
         values = [r["eval_macro_f1"] for r in results]
         
-
         return np.mean(values)
 
-
-
+    if not SHOW_LOAD_REPORT: # Ocultar mensaje de carga del modelo
+        hf_logging.set_verbosity_error()
 
     # Se obtiene o crea estudio a partir de base de datos sqllite
     study = optuna.create_study(direction='maximize',study_name=OPT_STUDY,storage=OPT_DB,load_if_exists=True)
@@ -55,4 +58,4 @@ if __name__ == "__main__":
     if OPT_TIME > 0: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos
         optimize(study,objective,OPT_TIME)
     else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
-        testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL)
+        testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP)
