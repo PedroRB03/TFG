@@ -23,6 +23,7 @@ if __name__ == "__main__":
     BALANCED_CW = params["BERT"]["BALANCED_CW"]
     SHOW_LOAD_REPORT = params["BERT"]["SHOW_LOAD_REPORT"]
     FUZZY_BAL_CRISP = params["COMMON"]["FUZZY_BAL_CRISP"]
+    MODEL_NAME = params["BERT"]["MODEL_NAME"]
     ##
    
 
@@ -33,16 +34,17 @@ if __name__ == "__main__":
         u_file = FILE_F
 
     # Función para buscar hiperparámetros
-    def objective(trial):
+    def objective(trial: optuna.Trial):
 
         param_grid = {
             'learning_rate' : trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True),
             'num_train_epochs' : trial.suggest_int("num_train_epochs", 1 , 4),
             'warmup_steps' : trial.suggest_int("warmup_steps", 100 , 600),
             'weight_decay' : trial.suggest_int("weight_decay", 0.01 , 0.1),
+            'gradient_accumulation_steps' : trial.suggest_categorical("gradient_accumulation_steps",[1,2,4,8])
         }
 
-        results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,False,BALANCED_CW,FUZZY_BAL_CRISP)
+        results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,False,BALANCED_CW,FUZZY_BAL_CRISP,model_name=MODEL_NAME)
         
         values = [r["eval_macro_f1"] for r in results]
         
@@ -58,4 +60,4 @@ if __name__ == "__main__":
     if OPT_TIME > 0: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos
         optimize(study,objective,OPT_TIME)
     else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
-        testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP)
+        testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name=MODEL_NAME)

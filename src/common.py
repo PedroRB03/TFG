@@ -32,6 +32,7 @@ PARAM_DEFAULTS = {
         "BALANCING" : "None", 
         "NGRAM_MIN" : 1, 
         "NGRAM_MAX" : 3,
+        "STUDY_OUT" : "results/analytics",
     },
     "LGBM" : { 
         "OPT_TIME" : 60, 
@@ -60,6 +61,7 @@ PARAM_DEFAULTS = {
         "SAVE_MODEL" : False, 
         "BALANCED_CW" : False, 
         "SHOW_LOAD_REPORT" : True, 
+        "MODEL_NAME" : "microsoft/deberta-v3-small",
     },
 }
 
@@ -101,10 +103,10 @@ def get_params(fname="params.ini"):
 
 # Función de normalización de texto
 def normalize_text(text):
-        text = re.sub(r'(\[.*\]\(.*\))|(<URL>)|(http[^\s]+)|(https[^\s]+)', '[URL]', text) # Formateo de URLs
-        text = re.sub(r'(@\w+)|(<USER>)', '[USER]', text) # Formateo usuarios
-        text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)|\[removed\]','', text) # He quitado <b><b\> y post eliminados
-        return text
+    text = re.sub(r'(\[.*\]\(.*\))|(<URL>)|(http[^\s]+)|(https[^\s]+)', '[URL]', text) # Formateo de URLs
+    text = re.sub(r'(@\w+)|(<USER>)', '[USER]', text) # Formateo usuarios
+    text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)|\[removed\]','', text) # He quitado <b><b\> y post eliminados
+    return text
 
 # Esta función devuelve el índice del elemento más cercano al valor dado de una lista
 def _closest(v,l):
@@ -156,7 +158,7 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
         if FUZZY_BAL_CRISP and balancing != "SMOTE": # Con SMOTE no usamos datos CRISP para balancear
             y = (df['label']).round().astype(int)
         else:
-            y = np.floor(df['label']*100).astype(int)
+            y = np.floor(df['label']*3).astype(int)
 
         x = vstack(df["vec"].to_list())
         x_new, y_new = bal.fit_resample(x,y)
@@ -170,9 +172,9 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
                 for i in range(n_og,n_new):
                     y_i = y_new[i]
                     if is_float:
-                        y_i = float(y_i)/100
+                        y_i = float(y_i)/3
                     else:
-                        y_i = int(y_i)/100
+                        y_i = int(y_i)/3
                     vec_i = x_new[i]
                     txt_rng = df['txt'][rng.integers(0,n_og)] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar bert
                     new_rows['txt'].append(txt_rng)

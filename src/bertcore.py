@@ -14,17 +14,6 @@ from pathlib import Path
 import torch.nn.functional as F
 from transformers import set_seed
 
-model_name = "microsoft/mdeberta-v3-base"
-    
-tokenizer = AutoTokenizer.from_pretrained(model_name,
-                                            use_fast=True,
-                                            extra_special_tokens=['[URL]','[USER]']
-                                            )
-
-# Tokeniza los ejemplares del dataset para su posterior uso por el modelo bert
-def tokenize_function(examples):
-    return tokenizer(examples["txt"], padding="max_length", truncation=True, max_length=256)
-
 # Función para calcular métricas
 def compute_metrics(FUZZY, eval_pred):
     logits, labels = eval_pred
@@ -49,11 +38,11 @@ def compute_metrics(FUZZY, eval_pred):
     }
 
 # Permite entrenar el modelo con los parámetros dados y muestra una media de las métricas de evaluación
-def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW=False,FUZZY_BAL_CRISP=False):
+def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name="microsoft/deberta-v3-small"):
     
     param_grid = study.best_params # Cargamos mejores parámetros
 
-    results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP)
+    results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name)
 
     # Hacemos print de resultados finales
     print("\n" + "="*30)
@@ -65,7 +54,7 @@ def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BAL
         print(f"{m[5:]}: {np.mean(values):.4f} (+/- {np.std(values):.4f})")
 
 # Carga y aplica la función de tokenización a los datasets de entrenamiento, evaluación y test y los devuelve.
-def obtain_tokenized(u_file, seed):
+def obtain_tokenized(tokenize_function, u_file, seed):
     train_ds = pd.read_pickle(u_file+str(seed)+"train.pkl")
     eval_ds = pd.read_pickle(u_file+str(seed)+"eval.pkl")
     test_ds = pd.read_pickle(u_file+str(seed)+"test.pkl")
@@ -109,7 +98,16 @@ def weighted_compute_loss(class_weights, outputs, labels, num_items_in_batch=Non
     return loss
 
 # Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación
-def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=False):
+def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name = "microsoft/deberta-v3-small"):
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name,
+                                                use_fast=True,
+                                                extra_special_tokens=['[URL]','[USER]']
+                                                )
+
+    def tokenize_function(examples):
+        return tokenizer(examples["txt"], padding="max_length", truncation=True, max_length=256)
+
 
     results = [] # Resultados de cada semilla
 
@@ -118,7 +116,7 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
 
         set_seed(seed) 
 
-        t_train, t_eval, t_test = obtain_tokenized(u_file,seed) # datasets tokenizados
+        t_train, t_eval, t_test = obtain_tokenized(tokenize_function,u_file,seed) # datasets tokenizados
 
         dname = RESULTS+"/seed"+str(seed)
         Path(dname).mkdir(parents=True, exist_ok=True) # Creamos ruta si no existe
@@ -139,6 +137,7 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             save_strategy='best',
             per_device_train_batch_size=8,
             per_device_eval_batch_size=8,
+            gradient_accumulation_steps=param_grid['gradient_accumulation_steps'],
             learning_rate=param_grid['learning_rate'],
             num_train_epochs=param_grid['num_train_epochs'],
             warmup_steps=param_grid['warmup_steps'],

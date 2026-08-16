@@ -1,4 +1,4 @@
-import openpyxl
+
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from common import get_params,normalize_text,make_vectorizer, balance
@@ -7,7 +7,57 @@ import joblib
 from pathlib import Path
 
 
+# Separa datos en tres subconjuntos: entrenamiento, evaluación y test.
+def _data_separate(df,test_size,eval_size,seed=1):
+    if (test_size+eval_size) >= 100: # Comprobamos validez de los porcentajes
+        raise Exception("test_size y eval_size no pueden sumar 100 o valores superiores.")
+    df_train, df_testeval = train_test_split(df, test_size=test_size/100+eval_size/100, stratify=df['label'], random_state=seed)
+    df_eval, df_test = train_test_split(df_testeval, test_size=test_size/(test_size+eval_size), stratify=df_testeval['label'], random_state=seed)
+    # Reseteamos índices
+    df_train=df_train.reset_index(drop=True)
+    df_eval=df_eval.reset_index(drop=True)
+    df_test=df_test.reset_index(drop=True)
 
+    return df_train, df_eval, df_test
+
+def _distnel(l1,l2):
+    return len(set(l1).intersection(set(l2))) > 0 
+
+# Obtiene y prepara los dataframes a partir de una ruta al dataset
+def get_dfs(FILE):
+    # Creamos dataframes
+    df = pd.read_excel(FILE)
+    # Renombramos columnas
+    df.columns = ['txt','a1','a2','a3','label']
+
+    print("Duplicados post-normalización: ", len(df['txt'])-len(df['txt'].drop_duplicates()))
+    # Eliminamos filas con valores no deseados
+    allowed = ["Normal","Trolling"]
+    df = df[df['a1'].isin(allowed) & df['a2'].isin(allowed) & df['a3'].isin(allowed)]
+    
+    # Normalizamos texto
+    df['txt'] = df['txt'].apply(lambda x: normalize_text(str(x)))
+
+    # Reemplazamos "Normal" y "Trolling" por 0 y 1 respectivamente
+    rep_list = ['a1','a2','a3','label']
+    mapping = {'Normal':0, 'Trolling': 1}
+    df[rep_list] = df[rep_list].replace(mapping)
+
+    # Hacemos una copia para el dataset fuzzy
+    dff = df.copy()
+    # Obtenemos valores fuzzy
+    dff['label'] = dff[['a1','a2','a3']].mean(axis=1)
+    
+    # Eliminamos columnas no útiles
+    dff = dff[['txt','label']]
+    df = df[['txt','label']]
+    dff.columns = ['txt','label']
+    df.columns = ['txt','label']
+
+    # Quitamos duplicados
+    df = df.drop_duplicates(subset=['txt'],keep=False,ignore_index=True) 
+    dff = dff.drop_duplicates(subset=['txt'],keep=False,ignore_index=True) 
+    return df,dff
 
 if __name__ == "__main__":
             
@@ -30,75 +80,9 @@ if __name__ == "__main__":
     NGRAM_MAX = params["DATAGEN"]["NGRAM_MAX"]
     ##
 
-    data = { # datos crisp
-        "txt" : [],
-        "label" : [],
-    }
-
-    data_f = { # datos fuzzy
-        "txt" : [],
-        "label" : [],
-    }
-
-    wb = openpyxl.load_workbook(FILE)
-    sheet = wb.active
-
-    n = 0
-    gen = sheet.rows
-    gen.__next__() # Saltar primera fila
-
-    for row in gen: # Recordamos, saltando la primera fila
-        txt = normalize_text(str(row[0].value))
-        vote = [row[1].value,row[2].value,row[3].value]
-        rb = vote.count("Trolling")
-
-        filtrar = False
-        # Comprobamos que no hayan valores no deseados
-        for v in vote:
-            if v not in ["Trolling","Normal"]:
-                filtrar = True
-                break
-            
-        if len(txt) > 0 and not filtrar: # No añadir filas en blanco o con valores no admitidos
-            n+=1
-            #if rb in [0,3]:
-            data_f['txt'].append(txt)
-            data_f['label'].append(round(rb/3 *100)/100)
-
-            data['txt'].append(txt)
-            data['label'].append(round(rb/3))
-            
-            if n >= N: # Cortamos al leer N filas.
-                break
+    df,dff = get_dfs(FILE)
 
 
-
-    # Separa datos en tres subconjuntos: entrenamiento, evaluación y test.
-    def data_separate(df,test_size,eval_size,seed=1):
-        if (test_size+eval_size) >= 100: # Comprobamos validez de los porcentajes
-            raise Exception("test_size y eval_size no pueden sumar 100 o valores superiores.")
-        df_train, df_testeval = train_test_split(df, test_size=test_size/100+eval_size/100, stratify=df['label'], random_state=seed)
-        df_eval, df_test = train_test_split(df_testeval, test_size=test_size/(test_size+eval_size), stratify=df_testeval['label'], random_state=seed)
-        # Reseteamos índices
-        df_train=df_train.reset_index(drop=True)
-        df_eval=df_eval.reset_index(drop=True)
-        df_test=df_test.reset_index(drop=True)
-
-        return df_train, df_eval, df_test
-
-    def distnel(l1,l2):
-        return len(set(l1).intersection(set(l2))) > 0 
-
-    # Creamos dataframes
-    df = pd.DataFrame(data)
-    df = df.drop_duplicates(subset=['txt']) # Quitamos duplicados
-
-
-    dff = pd.DataFrame(data_f)
-    dff = dff.drop_duplicates(subset=['txt']) # Quitamos duplicados
-
-
-    
     dfs = [df, dff] 
     tfidfs = ["/tfidf_crisp","/tfidf_fuzzy"]
     filepaths = [OUT_FILE+"/rb_db",OUT_FILE_F+"/rbf_db"]
@@ -115,7 +99,7 @@ if __name__ == "__main__":
             title = titles[i]
 
             print(title)
-            df_tr, df_ev,df_tst = data_separate(df_i,TEST_PERCENT,EVAL_PERCENT,seed)
+            df_tr, df_ev,df_tst = _data_separate(df_i,TEST_PERCENT,EVAL_PERCENT,seed)
             tfidf = make_vectorizer((NGRAM_MIN,NGRAM_MAX))
             vec_tr = tfidf.fit_transform(df_tr["txt"])
             vec_ev = tfidf.transform(df_ev["txt"])
@@ -130,20 +114,11 @@ if __name__ == "__main__":
 
             if BALANCING is not None and BALANCING != "None" and BALANCING != "": # Balanceamos si BALANCING no es None
                 df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=FUZZY_BAL_CRISP)
-                
-            if VERBOSE:
-                print(f"TRAIN \n{df_tr.tail()}")
-                print(f"EVAL \n{df_ev.tail()}")
-                print(f"TEST \n{df_tst.tail()}")
-                
+              
             df_tr.to_pickle(f_path+str(seed)+"train.pkl")
             df_ev.to_pickle(f_path+str(seed)+"eval.pkl")
             df_tst.to_pickle(f_path+str(seed)+"test.pkl")
-
-            if CHECK_COL and (distnel(df_tr["txt"],df_ev["txt"]) or distnel(df_tst["txt"],df_ev["txt"])):
-                print("Hay elementos comunes en los datasets...")
-                print("Dataset: "+title+" en semilla: "+str(seed))
-                break
+  
 
 
     print("Ficheros generados.")
