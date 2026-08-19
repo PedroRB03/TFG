@@ -10,6 +10,8 @@
     }
     
 
+def _distnel(l1,l2):
+    return len(set(l1).intersection(set(l2))) > 0 
 wb = openpyxl.load_workbook(FILE)
     sheet = wb.active
 

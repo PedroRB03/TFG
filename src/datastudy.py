@@ -10,7 +10,8 @@ import numpy as np
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-
+from pathlib import Path
+from math import inf
 
 # Muestra los diagramas mientras se calculan, pero pausa el flujo del programa hasta que se cierren
 SHOW = False
@@ -25,25 +26,22 @@ def stats_nclass(df):
     cats = df['label'].unique()
     t = len(df['label'])
     print("="*10 + "Frecuencias por clase" + "="*10)
-    #table = {'Clase':[],'Nº':[],'%':[]}
+
+    print("\\begin{tabular}{|c|c|c|} \\hline")
+    print("Clase & Ejemplares & Frecuencia \\\\ \\hline")
     for c in cats:
         n = len(df[df['label'] == c])
-        #table['Clase'].append(c)
-        #table['Nº'].append(n)
-        #table['%'].append(n/t*100)
-        print('Nº de ',c,' = ',n,' o ', f'{n/t*100:.3f}', '%')
-    #table = pd.DataFrame(table)
-    #plt.table(cellText=table.values,colLabels=table.columns, loc='center')
-    #plt.axis('off')
-    #plt.tight_layout()
-    #plt.show()
+        print(f'{c} & {n} & {n/t*100:.2f}\\% \\\\ \\hline')
+    print("\\end{tabular}")
 
 # Muestra ejemplos por clase de cada jurado
 def stats_bars(df,pret):
     j_bars = ['a1','a2','a3','label']
     j_title = ['Jurado 1', 'Jurado 2', 'Jurado 3', 'Mayoría']
     for i,j in enumerate(j_bars):
-        df[j].value_counts().plot(kind='bar', color=['skyblue','salmon'], title='Distribución de Clases de '+j_title[i],xlabel='Clase',ylabel='Nº de ejemplos')
+        ax = df[j].value_counts().plot(kind='bar', color=['skyblue','salmon'], title='Distribución de Clases de '+j_title[i],xlabel='Clase',ylabel='Nº de ejemplos')
+        ax.margins(y=0.15)
+        ax.bar_label(ax.containers[0], padding=3)
         plt.tight_layout()
         if SHOW:
             plt.show()
@@ -57,12 +55,11 @@ def stats_bars(df,pret):
 def stats_fleissk(df):
     cats = df['label'].unique()
     j_cols = ['a1', 'a2', 'a3']
-    c = df[j_cols].apply(lambda x: x.map({cat: i for i, cat in enumerate(cats)})).values
+    c = df[j_cols].apply(lambda x: x.map({cat: i for i, cat in enumerate(cats)})).values # Reemplazamos categorías por números
     mat = np.zeros((len(df), len(cats)))
     for i, row in enumerate(c):
         for val in row:
             mat[i, val] += 1
-
     print("="*10 + "Fleiss's Kappa" + "="*10)
     print(f"Fleiss's Kappa: {fleiss_kappa(mat):.3f}")
 
@@ -74,7 +71,6 @@ def stats_confmat(df,pret):
         sns.heatmap(pd.crosstab(df[j], df['label'], rownames=[f'Juez {i+1}'],colnames=['Mayoría'],), annot=True,fmt='g', cmap="YlGnBu")              
         plt.title(f'Juez {i+1} vs Mayoría')
         plt.tight_layout()
-        
         if SHOW:
             plt.show()
         else:
@@ -83,35 +79,68 @@ def stats_confmat(df,pret):
 
 
 # Calcula valores atípicos
-def _outliers(s):
-    Q1 = s.quantile(0.25)
-    Q3 = s.quantile(0.75)
+def _outliers(df):
+    Q1 = df['char_len'].quantile(0.25)
+    Q3 = df['char_len'].quantile(0.75)
     IQR = Q3 - Q1
     linf = Q1 - 1.5 * IQR
     lsup = Q3 + 1.5 * IQR
-    return ((s < linf) | (s > lsup)).sum()
+    return ((df['char_len'] < linf) | (df['char_len'] > lsup))
 
-# Muestra diagrama de cajas y bigotes y la cantidad de valores atípicos por clase
-def stats_boxplot(df,pret):
+# Muestra la cantidad de valores atípicos por clase
+def stats_outliers(df):
     cats = df['label'].unique()
     df['char_len'] = df['txt'].astype(str).str.len()
-    #df['punct_count'] = df['txt'].astype(str).apply(lambda x: sum(not c.isalnum() and not c.isspace() for c in x))
     
-    print("="*10 + "Valores atípicos por clase" + "="*10)
+    print("="*10 + "Valores atípicos de la longitud del texto por clase" + "="*10)
+
+    tot = 0
     for c in cats:
-        n = _outliers(df[df['label'] == c]['char_len'])
-        print("En", c," hay una cantidad de ", n, " ejemplos fuera del rango intercuartil")
+        s = _outliers(df[df['label'] == c])
+        outl = df[df['label'] == c][s]
+        n = len(outl)
+        tot+=n
+
+    print("\\begin{tabular}{|c|c|c|} \\hline")
+    print("Clase & Valores atípicos & Frecuencia \\\\ \\hline")
+
+    for c in cats:
+        s = _outliers(df[df['label'] == c])
+        outl = df[df['label'] == c][s]
+        n = len(outl)
+        print(f'{c} & {n} & {n/tot*100:.2f}\\% \\\\ \\hline')
+
+    print(f'Total & {tot} & \\\\ \\hline')
+    print("\\end{tabular}")
+
+# Muestra diagrama de cajas y bigotes de la longitud de los ejemplares
+def stats_boxplot(df,pret,fit):
+    cats = df['label'].unique()
+    df['char_len'] = df['txt'].astype(str).str.len()
     
-    #fig, ax = plt.subplots(1, 2, figsize=(12, 4))
-    sns.boxplot(x='label', y='char_len', data=df) #,ax=ax[0])
-    #ax[0].set_title('Longitud de Texto')
-    #sns.boxplot(x='label', y='punct_count', data=df, ax=ax[1])
-    #ax[1].set_title('Cantidad de Puntuación')
+    y_min = inf
+    y_max = -inf
+    for c in cats:
+        s = _outliers(df[df['label'] == c])
+        noutl = df[df['label'] == c][s == False]
+        y_min = min(y_min,noutl['char_len'].min())
+        y_max = max(y_max,noutl['char_len'].max())
+
+    margen = (y_max - y_min)* 0.05
+
+    ax = sns.boxplot(x='label', y='char_len', data=df) #,ax=ax[0])
+    ax.set_xlabel("Clase")
+    ax.set_ylabel("Longitud")
+    if fit:
+        ax.set_ylim(y_min - margen, y_max + margen)
     plt.tight_layout()
     if SHOW:
         plt.show()
     else:
-        plt.savefig(pret+"dcabi.png")
+        if fit:
+            plt.savefig(pret+"fitdcabi.png")
+        else:
+            plt.savefig(pret+"nofitdcabi.png")
         plt.clf()
 
 
@@ -136,15 +165,16 @@ def stats_freqword(df,N,per_row):
 
     if per_row:
         df["txt_unique"] = df["txt"].apply(lambda x: " ".join(set(str(x).lower().split())))
-
+    
     for c, grp in df.groupby("label"):
-        print("="*10 + str(N) + f"{" Palabras más frecuentes de "+ c:<54}" + "="*10)
-
+        print("\\begin{table}[H]")
+        print("\\centering")
+        print("\\begin{tabular}{|c|c|c|} \\hline")
         if per_row:
             txt = " ".join(grp["txt_unique"].dropna().astype(str)).lower()
         else:
             txt = " ".join(grp["txt"].dropna().astype(str)).lower()
-
+        
         # Tokenización de NLTK
         tokens = word_tokenize(txt, language="english")
 
@@ -155,20 +185,14 @@ def stats_freqword(df,N,per_row):
 
         fdist = nltk.FreqDist(wrds)
         top = fdist.most_common(N)
-        print(f"{'Palabra':<20} | {'Apariciones':<12} | Frecuencia")
-        print("="*76)
+        print("\\multicolumn{3}{|c|}{\\textit{"+c+"}} \\\\ \\hline")
+        print("Palabra & Apariciones & Frecuencia \\\\ \\hline")
         for w, n in top:
-            print(f"{w:<20} | {n:<12} | {n/len(wrds) * 100:.3f}%")
+            print(f'{w} & {n} & {n/len(wrds)*100:.2f}\\% \\\\ \\hline')
+        print("\\end{tabular}")
+        print("\\caption{20 palabras más frecuentes de \\textit{"+c+"}}")
+        print("\\end{table}")
 
-# Muestra el nº de tokens por clase
-def stat_tokencount(df,tok):
-    cats = df['label'].unique()
-    t = df['txt'].str.count(tok).sum()
-    print("="*10 + "Frecuencia de tokens " + tok + "="*10)
-    print("Nº de ",tok," Total = ", t)
-    for c in cats:
-     n = df[df['label'] == c]['txt'].str.count(tok).sum()
-     print("Nº de ",tok," de ", c ," = ", n," o ", f"{n/t*100:.3f}" ,"%")
 
 # Obtiene cantidad de filas duplicadas
 def getdupes(df):
@@ -181,7 +205,8 @@ if __name__ == "__main__":
     FILE = params["DATAGEN"]["FILE"]
     STUDY_OUT = params["DATAGEN"]["STUDY_OUT"]
     ##
-
+    Path(STUDY_OUT).mkdir(parents=True, exist_ok=True) # Creamos ruta si no existe
+    
     sns.set_theme(style="whitegrid")
 
     def _statshow(filter,pret):
@@ -191,19 +216,22 @@ if __name__ == "__main__":
         # Cambios nombres de las columnas por comodidad
         df.columns = ['txt','a1','a2','a3','label']
         allowed = ["Normal","Trolling"]
-        if filter:
-            df = df[df['a1'].isin(allowed) & df['a2'].isin(allowed) & df['a3'].isin(allowed)] # Quitamos clases no contempladas
-        # Número de ejemplos de cada clase
-        stats_nclass(df)
+        
+        
         # Normalizamos texto
         print("="*10 + "Filas duplicadas" + "="*10)
         print("Duplicados pre-normalización: ", getdupes(df))
         df['txt'] = df['txt'].apply(lambda x: normalize_text(str(x)))
         print("Duplicados post-normalización: ", getdupes(df))
 
-        # Contar [URL] y [USER]
-        stat_tokencount(df,"[URL]")
-        stat_tokencount(df,"[USER]")
+        if filter:
+            df = df[df['a1'].isin(allowed) & df['a2'].isin(allowed) & df['a3'].isin(allowed)] # Quitamos clases no contempladas
+            
+        # Quitamos duplicados
+        df = df.drop_duplicates(subset=['txt'],keep=False,ignore_index=True) 
+
+        # Número de ejemplos de cada clase
+        stats_nclass(df)
 
         # Distribución de clases por jurado
         stats_bars(df,pret)
@@ -212,7 +240,9 @@ if __name__ == "__main__":
         # Jurado vs Popular, matriz de confusión
         stats_confmat(df,pret)
         # Diagrama de caja y bigotes
-        stats_boxplot(df,pret)
+        stats_outliers(df)
+        stats_boxplot(df,pret,fit=False)
+        stats_boxplot(df,pret,fit=True)
         # Frecuencia de palabras
         print("="*20 + "Frecuencia de palabras total" + "="*20)
         stats_freqword(df,20,False)

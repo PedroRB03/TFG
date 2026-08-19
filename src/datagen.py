@@ -20,8 +20,6 @@ def _data_separate(df,test_size,eval_size,seed=1):
 
     return df_train, df_eval, df_test
 
-def _distnel(l1,l2):
-    return len(set(l1).intersection(set(l2))) > 0 
 
 # Obtiene y prepara los dataframes a partir de una ruta al dataset
 def get_dfs(FILE):
@@ -30,7 +28,6 @@ def get_dfs(FILE):
     # Renombramos columnas
     df.columns = ['txt','a1','a2','a3','label']
 
-    print("Duplicados post-normalización: ", len(df['txt'])-len(df['txt'].drop_duplicates()))
     # Eliminamos filas con valores no deseados
     allowed = ["Normal","Trolling"]
     df = df[df['a1'].isin(allowed) & df['a2'].isin(allowed) & df['a3'].isin(allowed)]

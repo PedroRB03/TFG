@@ -176,7 +176,7 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
                     else:
                         y_i = int(y_i)/3
                     vec_i = x_new[i]
-                    txt_rng = df['txt'][rng.integers(0,n_og)] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar bert
+                    txt_rng = df[df['label'] == y_i]['txt'][rng.integers(0,n_og)] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar bert
                     new_rows['txt'].append(txt_rng)
                     new_rows['label'].append(y_i)
                     new_rows['vec'].append(vec_i)
