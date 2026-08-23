@@ -19,11 +19,13 @@ if __name__ == "__main__":
     FILE = params["COMMON"]["FILE"]+"/rb_db"
     USE_TEST = params["LGBM"]["USE_TEST"]
     SAVE_MODEL = params["LGBM"]["SAVE_MODEL"]
+    SUBSAMEPLE_FREQ = params["LGBM"]["SUBSAMEPLE_FREQ"]
     ##
 
     model = LGBMClassifier(
             objective='binary',
             verbose=-1,
+            subsample_freq=SUBSAMEPLE_FREQ,
         )
 
     # Función para buscar hiperparámetros
@@ -33,11 +35,14 @@ if __name__ == "__main__":
             'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
             'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
             'num_leaves': trial.suggest_int('num_leaves', 20, 150),
-            'max_depth': trial.suggest_int('max_depth', 3, 12),
+            'max_depth': trial.suggest_int('max_depth', -0, 12),
             'min_child_samples': trial.suggest_int('min_child_samples', 5, 100),
-            'subsample': trial.suggest_float('subsample', 0.4, 1.0),
+            'subsample_freq': trial.suggest_int('subsample_freq', 0, 10),
             'colsample_bytree': trial.suggest_float('colsample_bytree', 0.4, 1.0),
         }
+        
+        if param_grid['subsample_freq'] > 0:
+            param_grid['subsample'] = trial.suggest_float('subsample', 0.4, 1.0)
 
         model.set_params(**param_grid)
         results, _ = get_results(model,FILE,SEEDS)

@@ -43,8 +43,8 @@ if __name__ == "__main__":
             'weight_decay' : trial.suggest_int("weight_decay", 0.01 , 0.1),
             'gradient_accumulation_steps' : trial.suggest_categorical("gradient_accumulation_steps",[1,2,4,8])
         }
-
-        results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,False,BALANCED_CW,FUZZY_BAL_CRISP,model_name=MODEL_NAME)
+        
+        results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST=False,SAVE_MODEL=False,BALANCED_CW=BALANCED_CW,FUZZY_BAL_CRISP=FUZZY_BAL_CRISP,model_name=MODEL_NAME,trial=trial)
         
         values = [r["eval_macro_f1"] for r in results]
         
@@ -53,8 +53,10 @@ if __name__ == "__main__":
     if not SHOW_LOAD_REPORT: # Ocultar mensaje de carga del modelo
         hf_logging.set_verbosity_error()
 
+
+    pruner = optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=2)
     # Se obtiene o crea estudio a partir de base de datos sqllite
-    study = optuna.create_study(direction='maximize',study_name=OPT_STUDY,storage=OPT_DB,load_if_exists=True)
+    study = optuna.create_study(direction='maximize',study_name=OPT_STUDY,storage=OPT_DB,load_if_exists=True, pruner=pruner)
 
 
     if OPT_TIME > 0: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos

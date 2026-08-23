@@ -1,7 +1,6 @@
 import pandas as pd
 from sklearn.metrics import roc_auc_score, f1_score,balanced_accuracy_score, matthews_corrcoef
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.utils import shuffle
 import numpy as np
 import re
 import configparser
@@ -9,6 +8,8 @@ from copy import deepcopy
 from scipy.sparse import vstack
 from math import inf
 from sklearn.utils.class_weight import compute_class_weight
+from optuna.exceptions import TrialPruned
+
 
 from imblearn.under_sampling import EditedNearestNeighbours, RandomUnderSampler
 from imblearn.over_sampling import SMOTE
@@ -26,9 +27,6 @@ PARAM_DEFAULTS = {
         "TEST_PERCENT" : 15,
         "EVAL_PERCENT" : 15,
         "FILE" : 'trolling.xlsx',
-        "N" : inf, 
-        "VERBOSE" : False, 
-        "CHECK_COL" : False, 
         "BALANCING" : "None", 
         "NGRAM_MIN" : 1, 
         "NGRAM_MAX" : 3,
@@ -44,6 +42,7 @@ PARAM_DEFAULTS = {
     },
     "SVM" : {
         "OPT_TIME" : 60, 
+        "KERNEL" : "nu", 
         "OPT_STUDY" : "svm-study", 
         "OPT_DB" : "sqlite:///svm-study.db",
         "MODEL_PATH" : "", 
@@ -95,8 +94,8 @@ def get_params(fname="params.ini"):
                                 res[csec][param].append(int(i))
                         case _:
                             res[csec][param] = config[csec][param]
-    if res["DATAGEN"]["N"] == 0: # El parámetros N en concreto puede ser infinito
-        res["DATAGEN"]["N"] = inf
+    #if res["DATAGEN"]["N"] == 0: # El parámetros N en concreto puede ser infinito
+    #    res["DATAGEN"]["N"] = inf
     return res
 
 
@@ -176,7 +175,8 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
                     else:
                         y_i = int(y_i)/3
                     vec_i = x_new[i]
-                    txt_rng = df[df['label'] == y_i]['txt'][rng.integers(0,n_og)] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar bert
+                    cdf = df[df['label'] == y_i]
+                    txt_rng = cdf['txt'][rng.integers(0,len(cdf))] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar bert
                     new_rows['txt'].append(txt_rng)
                     new_rows['label'].append(y_i)
                     new_rows['vec'].append(vec_i)
@@ -197,11 +197,18 @@ def compute_metrics(y_test,y_pred,y_probs):
     }
 
 # Obtener métricas a partir de un modelo y distintas semillas. También devuelve el modelo entrenado de cada semilla.
-def get_results(model,file,seeds,is_test=False):
+def get_results(model,file,seeds,is_test=False,trial=None):
     results = []
     models = {}
 
     for seed in seeds:
+        if trial is not None:
+            if trial.should_prune():
+                raise TrialPruned(f"Podada semilla {seed} por decisión del pruner.")
+            if should_prune(trial,results,len(seeds)):
+                raise TrialPruned(f"Podada semilla {seed} por media optimista inferior al mejor estudio.")
+            
+
         train_ds = pd.read_pickle(file+str(seed)+"train.pkl")
         if is_test:
             test_ds = pd.read_pickle(file+str(seed)+"test.pkl")
@@ -210,9 +217,10 @@ def get_results(model,file,seeds,is_test=False):
         
         X_trn = vstack(train_ds["vec"].to_list())
         X_tst = vstack(test_ds["vec"].to_list())
-        Y_trn = train_ds["label"]
-        Y_tst = test_ds["label"]
-
+        Y_trn = train_ds["label"].astype("category")
+        Y_tst = test_ds["label"].astype("category")
+        
+        model.set_params(random_state=seed)
         model.fit(X_trn,Y_trn)
         y_pred = model.predict(X_tst)
         y_probs = model.predict_proba(X_tst)[:,1]
@@ -229,6 +237,21 @@ def make_vectorizer(ngram_range):
         stop_words="english",
         #lowercase=True
     )
+
+# Obtiene una media optimista en mitad de un trial de Optuna y decide si se debería podar el intento 
+def should_prune(trial,results,n,eval_name='macro_f1'):
+    try:
+        bf1 = trial.study.best_value
+    except ValueError:
+        bf1 = -float('inf')
+    i = 0
+    med = 0
+    for r in results:
+        med+=r[eval_name]
+        i+=1
+    for j in range(i,n):
+        med+=1
+    return med/n < bf1
 
 # Busca los mejores parámetros para el estudio y pipeline pasado
 # Necesita una función objective que acepte el pipeline como primer parámetro

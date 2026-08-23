@@ -19,3 +19,24 @@ def stat_tokencount(df):
         # Contar [URL] y [USER]
         #stat_tokencount(df)
         
+# Muestra número tokens medio, mínimo y máximo por clase
+def stats_tokens(df,model_name):
+    t = len(df['label'])
+    print("="*10 + "Tokens por clase" + "="*10)
+
+
+    tokenizer, tokenize_function = get_tokenizer(model_name)
+
+
+    df = Dataset.from_pandas(df)
+    df = df.map(tokenize_function, batched=True)
+    df = df.to_pandas()
+    df["num_tokens"] = df["input_ids"].apply(len)
+
+    for c, grp in df.groupby("label"):
+        print(f"Valor mínimo de {c}: {grp['num_tokens'].min()}")
+        print(f"Valor máximo de {c}: {grp['num_tokens'].max()}")
+        print(f"Valor medio de {c}: {grp['num_tokens'].mean()}")
+
+        # Número de tokens
+        stats_tokens(df,MODEL_NAME)

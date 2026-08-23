@@ -12,6 +12,8 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from pathlib import Path
 from math import inf
+from bertcore import get_tokenizer
+from datasets import Dataset
 
 # Muestra los diagramas mientras se calculan, pero pausa el flujo del programa hasta que se cierren
 SHOW = False
@@ -21,16 +23,16 @@ nltk.download("stopwords", quiet=True)
 nltk.download('punkt')
 nltk.download('punkt_tab')
 
+
 # Muestra la frecuencia por clase
 def stats_nclass(df):
-    cats = df['label'].unique()
     t = len(df['label'])
     print("="*10 + "Frecuencias por clase" + "="*10)
 
     print("\\begin{tabular}{|c|c|c|} \\hline")
     print("Clase & Ejemplares & Frecuencia \\\\ \\hline")
-    for c in cats:
-        n = len(df[df['label'] == c])
+    for c, grp in df.groupby("label"):
+        n = len(grp)
         print(f'{c} & {n} & {n/t*100:.2f}\\% \\\\ \\hline')
     print("\\end{tabular}")
 
@@ -79,50 +81,49 @@ def stats_confmat(df,pret):
 
 
 # Calcula valores atípicos
-def _outliers(df):
-    Q1 = df['char_len'].quantile(0.25)
-    Q3 = df['char_len'].quantile(0.75)
+def _outliers(df,col='char_len'):
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
     IQR = Q3 - Q1
     linf = Q1 - 1.5 * IQR
     lsup = Q3 + 1.5 * IQR
-    return ((df['char_len'] < linf) | (df['char_len'] > lsup))
+    return ((df[col] < linf) | (df[col] > lsup))
 
 # Muestra la cantidad de valores atípicos por clase
 def stats_outliers(df):
-    cats = df['label'].unique()
     df['char_len'] = df['txt'].astype(str).str.len()
+    df['char_len'] = df['txt'].astype(str).str.len()
+    print("Mínima longitud de texto: ", df['char_len'].min())
+    print("Máxima longitud de texto: ", df['char_len'].max())
+    
     
     print("="*10 + "Valores atípicos de la longitud del texto por clase" + "="*10)
 
-    tot = 0
-    for c in cats:
-        s = _outliers(df[df['label'] == c])
-        outl = df[df['label'] == c][s]
-        n = len(outl)
-        tot+=n
+    print("\\begin{tabular}{|c|c|c|c|c|} \\hline")
+    print("Clase & Valores atípicos & Frecuencia & Mín-Máx Atípico & Mín-Máx Típico\\\\ \\hline")
 
-    print("\\begin{tabular}{|c|c|c|} \\hline")
-    print("Clase & Valores atípicos & Frecuencia \\\\ \\hline")
 
-    for c in cats:
-        s = _outliers(df[df['label'] == c])
-        outl = df[df['label'] == c][s]
+    for c, grp in df.groupby("label"):
+        s = _outliers(grp)
+        outl = grp[s]
+        inl = grp[s == False]
         n = len(outl)
-        print(f'{c} & {n} & {n/tot*100:.2f}\\% \\\\ \\hline')
+        tot = len(grp)
+        print(f'{c} & {n} & {n/tot*100:.2f}\\% & [{outl['char_len'].min()}-{outl['char_len'].max()}] & [{inl['char_len'].min()}-{inl['char_len'].max()}]\\\\ \\hline')
 
     print(f'Total & {tot} & \\\\ \\hline')
     print("\\end{tabular}")
 
+
 # Muestra diagrama de cajas y bigotes de la longitud de los ejemplares
 def stats_boxplot(df,pret,fit):
-    cats = df['label'].unique()
     df['char_len'] = df['txt'].astype(str).str.len()
-    
+
     y_min = inf
     y_max = -inf
-    for c in cats:
-        s = _outliers(df[df['label'] == c])
-        noutl = df[df['label'] == c][s == False]
+    for c, grp in df.groupby("label"):
+        s = _outliers(grp)
+        noutl = grp[s == False]
         y_min = min(y_min,noutl['char_len'].min())
         y_max = max(y_max,noutl['char_len'].max())
 
@@ -204,6 +205,7 @@ if __name__ == "__main__":
     params = get_params(sys.argv[1] if len(sys.argv) > 1 else "params.ini")
     FILE = params["DATAGEN"]["FILE"]
     STUDY_OUT = params["DATAGEN"]["STUDY_OUT"]
+    MODEL_NAME = params["BERT"]["MODEL_NAME"]
     ##
     Path(STUDY_OUT).mkdir(parents=True, exist_ok=True) # Creamos ruta si no existe
     
@@ -230,8 +232,10 @@ if __name__ == "__main__":
         # Quitamos duplicados
         df = df.drop_duplicates(subset=['txt'],keep=False,ignore_index=True) 
 
+
         # Número de ejemplos de cada clase
         stats_nclass(df)
+
 
         # Distribución de clases por jurado
         stats_bars(df,pret)

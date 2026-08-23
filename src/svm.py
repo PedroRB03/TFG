@@ -18,26 +18,33 @@ if __name__ == "__main__":
     FILE = params["COMMON"]["FILE"]+"/rb_db"
     USE_TEST = params["SVM"]["USE_TEST"]
     SAVE_MODEL = params["SVM"]["SAVE_MODEL"]
+    KERNEL = params["SVM"]["KERNEL"]
     ##
 
 
-    model = svm.NuSVC(
-        decision_function_shape="ovr",
-        probability=True
+    model = svm.SVC(
+        #decision_function_shape="ovr",
+        probability=True,
+        kernel=KERNEL
     )
 
 
     # Función para buscar hiperparámetros
     def objective(trial):
-        kernel = trial.suggest_categorical('kernel', ['linear', 'rbf', 'poly'])
+        #kernel = trial.suggest_categorical('kernel', ['linear', 'rbf', 'poly'])
 
-        param_grid = {
-            'nu': trial.suggest_float('nu', 0.1, 0.5),
-            'gamma': trial.suggest_float('gamma', 1e-3, 1.0, log=True),
-            'kernel': kernel,
-        }
-        if kernel == 'poly':
-            param_grid['degree'] = trial.suggest_int('degree', 2, 5)
+        param_grid = {'C': trial.suggest_float('C', 1e-3, 1000,log=True)}
+        
+        match KERNEL:
+            case "rbf":
+                param_grid['gamma'] = trial.suggest_float('gamma', 1e-4, 10.0, log=True)
+            case "poly":
+                param_grid['degree'] = trial.suggest_int('degree', 2, 5)
+                param_grid['gamma'] = trial.suggest_float('gamma', 1e-4, 10.0, log=True)
+                param_grid['coef0'] = trial.suggest_float('coef0', 0.0, 10.0, log=True)
+            case "sigmoid":
+                param_grid['gamma'] = trial.suggest_float('gamma', 1e-4, 10.0, log=True)
+                param_grid['coef0'] = trial.suggest_float('coef0', 0.0, 10.0, log=True)
 
         model.set_params(**param_grid)
         results , _ = get_results(model,FILE,SEEDS)

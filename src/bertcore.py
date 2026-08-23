@@ -13,6 +13,8 @@ import os
 from pathlib import Path
 import torch.nn.functional as F
 from transformers import set_seed
+from optuna import TrialPruned
+from common import should_prune
 
 # Función para calcular métricas
 def compute_metrics(FUZZY, eval_pred):
@@ -97,21 +99,34 @@ def weighted_compute_loss(class_weights, outputs, labels, num_items_in_batch=Non
 
     return loss
 
-# Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación
-def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name = "microsoft/deberta-v3-small"):
+# Devuelve la clase Tokenizer correspondiente al modelo y una función para obtener tokens
+def get_tokenizer(model_name):
 
     tokenizer = AutoTokenizer.from_pretrained(model_name,
                                                 use_fast=True,
                                                 extra_special_tokens=['[URL]','[USER]']
                                                 )
-
+    
     def tokenize_function(examples):
         return tokenizer(examples["txt"], padding="max_length", truncation=True, max_length=256)
 
+    return tokenizer, tokenize_function
+
+# Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación
+def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name = "microsoft/deberta-v3-small",trial=None):
+
+    tokenizer, tokenize_function = get_tokenizer(model_name)
 
     results = [] # Resultados de cada semilla
 
-    for seed in SEEDS:
+    for step,seed in enumerate(SEEDS):
+        if trial is not None:
+            if trial.should_prune():
+                raise TrialPruned(f"Podada semilla {seed} por decisión del pruner.")
+            if should_prune(trial,results,len(SEEDS),eval_name='eval_macro_f1'):
+                raise TrialPruned(f"Podada semilla {seed} por media optimista inferior al mejor estudio.")
+            
+
         print(f"\n--- Entrenando Seed {seed} ---")
 
         set_seed(seed) 
@@ -185,6 +200,8 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             eval_stats = trainer.evaluate(eval_dataset=t_test)
         else:
             eval_stats = trainer.evaluate(eval_dataset=t_eval)
+        if trial is not None:
+            trial.report(eval_stats['eval_macro_f1'],step=step)
         results.append(eval_stats)
 
     return results
