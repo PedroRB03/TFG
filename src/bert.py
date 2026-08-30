@@ -24,6 +24,9 @@ if __name__ == "__main__":
     SHOW_LOAD_REPORT = params["BERT"]["SHOW_LOAD_REPORT"]
     FUZZY_BAL_CRISP = params["COMMON"]["FUZZY_BAL_CRISP"]
     MODEL_NAME = params["BERT"]["MODEL_NAME"]
+    NO_TRAIN = params["BERT"]["NO_TRAIN"]
+    LOCAL_MODEL_NAME = params["BERT"]["LOCAL_MODEL_NAME"]
+    LOCAL_MODEL_DIR = params["BERT"]["LOCAL_MODEL_DIR"]
     ##
    
 
@@ -44,7 +47,7 @@ if __name__ == "__main__":
             'gradient_accumulation_steps' : trial.suggest_categorical("gradient_accumulation_steps",[1,2,4,8])
         }
         
-        results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST=False,SAVE_MODEL=False,BALANCED_CW=BALANCED_CW,FUZZY_BAL_CRISP=FUZZY_BAL_CRISP,model_name=MODEL_NAME,trial=trial)
+        results, _ = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST=False,SAVE_MODEL=False,BALANCED_CW=BALANCED_CW,FUZZY_BAL_CRISP=FUZZY_BAL_CRISP,MODEL_NAME=MODEL_NAME,trial=trial,tmodel_name=MODEL_NAME)
         
         values = [r["eval_macro_f1"] for r in results]
         
@@ -59,7 +62,10 @@ if __name__ == "__main__":
     study = optuna.create_study(direction='maximize',study_name=OPT_STUDY,storage=OPT_DB,load_if_exists=True, pruner=pruner)
 
 
-    if OPT_TIME > 0: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos
+    if OPT_TIME > 0 and not NO_TRAIN: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos
         optimize(study,objective,OPT_TIME)
     else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
-        testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name=MODEL_NAME)
+        if NO_TRAIN:
+            testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name=LOCAL_MODEL_DIR,NO_TRAIN=True,tmodel_name=MODEL_NAME)
+        else:
+            testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name=MODEL_NAME,tmodel_name=MODEL_NAME)

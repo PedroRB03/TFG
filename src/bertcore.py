@@ -3,18 +3,17 @@ import pandas as pd
 from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer, EarlyStoppingCallback
 import numpy as np
-from sklearn.metrics import (f1_score, balanced_accuracy_score, 
-                             matthews_corrcoef, roc_auc_score)
+from sklearn.metrics import f1_score, balanced_accuracy_score, matthews_corrcoef, roc_auc_score,accuracy_score
 from scipy.special import softmax
 import torch
-from common import get_class_weights
 import shutil
 import os
 from pathlib import Path
 import torch.nn.functional as F
 from transformers import set_seed
 from optuna import TrialPruned
-from common import should_prune
+from common import should_prune, get_class_weights, printtest
+import time
 
 # Función para calcular métricas
 def compute_metrics(FUZZY, eval_pred):
@@ -36,24 +35,21 @@ def compute_metrics(FUZZY, eval_pred):
         'macro_f1': f1_score(labels, predictions, average='macro'),
         'balanced_accuracy': balanced_accuracy_score(labels, predictions),
         'matthews_corrcoef': matthews_corrcoef(labels, predictions),
-        'roc_auc_ovr': roc_auc
+        'roc_auc_ovr': roc_auc,
+        'accuracy': accuracy_score(labels, predictions),
     }
 
 # Permite entrenar el modelo con los parámetros dados y muestra una media de las métricas de evaluación
-def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name="microsoft/deberta-v3-small"):
+def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name="microsoft/deberta-v3-small",NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
     
     param_grid = study.best_params # Cargamos mejores parámetros
 
-    results = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name)
+    results, times = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name,NO_TRAIN=NO_TRAIN,tmodel_name=tmodel_name)
 
-    # Hacemos print de resultados finales
-    print("\n" + "="*30)
-    print("RESULTADOS FINALES")
-    print("="*30)
     metric_names = ['eval_macro_f1', 'eval_balanced_accuracy', 'eval_matthews_corrcoef', 'eval_roc_auc_ovr']
-    for m in metric_names:
-        values = [r[m] for r in results]
-        print(f"{m[5:]}: {np.mean(values):.4f} (+/- {np.std(values):.4f})")
+
+    
+    printtest(SEEDS,results,times,metric_names)
 
 # Carga y aplica la función de tokenización a los datasets de entrenamiento, evaluación y test y los devuelve.
 def obtain_tokenized(tokenize_function, u_file, seed):
@@ -113,11 +109,14 @@ def get_tokenizer(model_name):
     return tokenizer, tokenize_function
 
 # Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación
-def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name = "microsoft/deberta-v3-small",trial=None):
+def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=False,MODEL_NAME = "microsoft/deberta-v3-small",trial=None,NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
 
-    tokenizer, tokenize_function = get_tokenizer(model_name)
+    tokenizer, tokenize_function = get_tokenizer(tmodel_name)
 
     results = [] # Resultados de cada semilla
+
+    fit_t = []
+    model_name = MODEL_NAME
 
     for step,seed in enumerate(SEEDS):
         if trial is not None:
@@ -138,6 +137,9 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
 
         shutil.rmtree(dname) # Borramos directorio y archivos donde se guardan los checkpoints
         os.mkdir(dname) # Lo volvemos a crear
+
+        if NO_TRAIN:
+            model_name = MODEL_NAME+"/bert_model"+str(seed)
 
         if FUZZY:
             model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=1,dtype=torch.float32) # Para regresión
@@ -187,13 +189,16 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             compute_loss_func=None if not BALANCED_CW else _c_loss
         )
 
-        trainer.train()
-        if SAVE_MODEL: # Guardamos modelo entrenado
+        st = time.time()
+        if not NO_TRAIN:
+            trainer.train()
+        fit_t.append(time.time()-st)
+
+        if SAVE_MODEL and not NO_TRAIN: # Guardamos modelo entrenado
             sdname = RESULTS+"/bert_model"+str(seed)
             Path(sdname).mkdir(parents=True, exist_ok=True)
-            print("Guardando modelo BERT...")
             trainer.save_model(sdname)
-            print("Modelo guardado.")
+            print(f"Modelo guardado en semilla {seed}.")
         
 
         if USE_TEST: # Calcula métricas con datos de test o evaluación
@@ -204,5 +209,5 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             trial.report(eval_stats['eval_macro_f1'],step=step)
         results.append(eval_stats)
 
-    return results
+    return results, fit_t
 

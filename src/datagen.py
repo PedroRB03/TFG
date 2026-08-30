@@ -102,9 +102,10 @@ if __name__ == "__main__":
             Path(VFILE).mkdir(parents=True, exist_ok=True)
             joblib.dump(tfidf, VFILE+tfidfp+str(seed)+".pkl")
             
-            df_tr['vec'] = [vec_tr.getrow(i) for i in range(vec_tr.shape[0])]
-            df_ev['vec'] = [vec_ev.getrow(i) for i in range(vec_ev.shape[0])]
-            df_tst['vec'] = [vec_tst.getrow(i) for i in range(vec_tst.shape[0])]
+            df_tr['vec'] = [vec_tr[i,:] for i in range(vec_tr.shape[0])]
+            df_ev['vec'] = [vec_ev[i,:] for i in range(vec_ev.shape[0])]
+            df_tst['vec'] = [vec_tst[i,:] for i in range(vec_tst.shape[0])]
+
 
             if BALANCING is not None and BALANCING != "None" and BALANCING != "": # Balanceamos si BALANCING no es None
                 df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=FUZZY_BAL_CRISP)

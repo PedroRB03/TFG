@@ -4,8 +4,6 @@ import warnings
 import numpy as np
 from common import get_results,optimize,test_study,make_vectorizer,get_params
 import sys
-import joblib
-from pathlib import Path
 
 if __name__ == "__main__":
 
@@ -14,18 +12,18 @@ if __name__ == "__main__":
     OPT_TIME = params["LGBM"]["OPT_TIME"]
     OPT_STUDY = params["LGBM"]["OPT_STUDY"]
     OPT_DB = params["LGBM"]["OPT_DB"]
-    MODEL_PATH = params["SVM"]["MODEL_PATH"]
+    MODEL_PATH = params["LGBM"]["MODEL_PATH"]
     SEEDS = params["COMMON"]["SEEDS"]
     FILE = params["COMMON"]["FILE"]+"/rb_db"
     USE_TEST = params["LGBM"]["USE_TEST"]
     SAVE_MODEL = params["LGBM"]["SAVE_MODEL"]
-    SUBSAMEPLE_FREQ = params["LGBM"]["SUBSAMEPLE_FREQ"]
+    NO_TRAIN = params["LGBM"]["NO_TRAIN"]
+    LOCAL_MODEL_DIR = params["LGBM"]["LOCAL_MODEL_DIR"]
     ##
 
     model = LGBMClassifier(
             objective='binary',
             verbose=-1,
-            subsample_freq=SUBSAMEPLE_FREQ,
         )
 
     # Función para buscar hiperparámetros
@@ -45,7 +43,7 @@ if __name__ == "__main__":
             param_grid['subsample'] = trial.suggest_float('subsample', 0.4, 1.0)
 
         model.set_params(**param_grid)
-        results, _ = get_results(model,FILE,SEEDS)
+        results, _ = get_results(model,FILE,SEEDS,is_test=False,trial=trial)
 
         values = [r["macro_f1"] for r in results]
 
@@ -60,10 +58,7 @@ if __name__ == "__main__":
     if OPT_TIME > 0: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos
         optimize(study,objective,OPT_TIME)
     else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
-        models = test_study(study,model,FILE,SEEDS,USE_TEST)
-        if SAVE_MODEL: # Guardar modelo
-            print("Guardando modelo LGBM...")
-            for seed in SEEDS:
-                Path(MODEL_PATH).mkdir(parents=True, exist_ok=True)
-                joblib.dump(models[seed], MODEL_PATH+"/lgbm_model"+str(seed)+".pkl")
-            print("Modelo guardado.")
+        if NO_TRAIN:
+            models = test_study(study,model,FILE,SEEDS,USE_TEST,SAVE_MODEL,LOCAL_MODEL_DIR,NO_TRAIN=NO_TRAIN)
+        else:
+            models = test_study(study,model,FILE,SEEDS,USE_TEST,SAVE_MODEL,MODEL_PATH)

@@ -8,3 +8,5 @@ src/__pycache__
 data/bert_results/*
 results/*
 results/analytics/*
+tmp_trainer
+best

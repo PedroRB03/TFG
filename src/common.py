@@ -1,15 +1,18 @@
 import pandas as pd
-from sklearn.metrics import roc_auc_score, f1_score,balanced_accuracy_score, matthews_corrcoef
+from sklearn.metrics import roc_auc_score, f1_score,balanced_accuracy_score, matthews_corrcoef, accuracy_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
 import re
+from datetime import timedelta
 import configparser
 from copy import deepcopy
 from scipy.sparse import vstack
 from math import inf
 from sklearn.utils.class_weight import compute_class_weight
 from optuna.exceptions import TrialPruned
-
+import time
+from pathlib import Path
+import joblib
 
 from imblearn.under_sampling import EditedNearestNeighbours, RandomUnderSampler
 from imblearn.over_sampling import SMOTE
@@ -18,49 +21,60 @@ from imblearn.over_sampling import SMOTE
 PARAM_DEFAULTS = {
     "COMMON" : { 
         "SEEDS" : [600,601,602,603,604],   
+        "VFILE" : "data/pkls/crisp/rb_db", 
         "FILE" : "rb_db", 
         "FILE_F" : "rbf_db", 
-        "VFILE" : "data/pkls/crisp/rb_db", 
         "FUZZY_BAL_CRISP" : False,
     },
     "DATAGEN" : {
         "TEST_PERCENT" : 15,
         "EVAL_PERCENT" : 15,
         "FILE" : 'trolling.xlsx',
+        "STUDY_OUT" : "results/analytics",
         "BALANCING" : "None", 
         "NGRAM_MIN" : 1, 
         "NGRAM_MAX" : 3,
-        "STUDY_OUT" : "results/analytics",
     },
     "LGBM" : { 
         "OPT_TIME" : 60, 
+        "NO_TRAIN" : False,
         "OPT_STUDY" : "lgbm-study", 
         "OPT_DB" : "sqlite:///lgbm-study.db", 
         "MODEL_PATH" : "", 
         "USE_TEST" : False, 
         "SAVE_MODEL" : False, 
+        "LOCAL_MODEL_DIR" : "", 
+        "VFILE" : "", 
+        "FILE" : "", 
     },
     "SVM" : {
         "OPT_TIME" : 60, 
-        "KERNEL" : "nu", 
+        "KERNEL" : "linear", 
+        "NO_TRAIN" : False,
         "OPT_STUDY" : "svm-study", 
         "OPT_DB" : "sqlite:///svm-study.db",
         "MODEL_PATH" : "", 
         "USE_TEST" : False,
         "SAVE_MODEL" : False,
+        "LOCAL_MODEL_DIR" : "", 
+        "VFILE" : "", 
+        "FILE" : "", 
     },
     "BERT" : { 
         "OPT_TIME" : 60, 
-        "OPT_STUDY" : "bert-study", 
-        "OPT_DB" : "sqlite:///bert-study.db", 
         "RESULTS" : "",
         "FUZZY" : False, 
-        "USE_TEST" : False, 
         "EARLY_STOP" : 3,
-        "SAVE_MODEL" : False, 
         "BALANCED_CW" : False, 
         "SHOW_LOAD_REPORT" : True, 
         "MODEL_NAME" : "microsoft/deberta-v3-small",
+        "NO_TRAIN" : False,
+        "OPT_STUDY" : "bert-study", 
+        "OPT_DB" : "sqlite:///bert-study.db", 
+        "USE_TEST" : False, 
+        "SAVE_MODEL" : False, 
+        "LOCAL_MODEL_DIR" : "", 
+        "LOCAL_MODEL_NAME" : "", 
     },
 }
 
@@ -159,7 +173,7 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
         else:
             y = np.floor(df['label']*3).astype(int)
 
-        x = vstack(df["vec"].to_list())
+        x = vstack(df["vec"])
         x_new, y_new = bal.fit_resample(x,y)
 
         n_og = len(df)
@@ -175,7 +189,7 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
                     else:
                         y_i = int(y_i)/3
                     vec_i = x_new[i]
-                    cdf = df[df['label'] == y_i]
+                    cdf = df[df['label'] == y_i].reset_index(drop=True)
                     txt_rng = cdf['txt'][rng.integers(0,len(cdf))] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar bert
                     new_rows['txt'].append(txt_rng)
                     new_rows['label'].append(y_i)
@@ -193,13 +207,15 @@ def compute_metrics(y_test,y_pred,y_probs):
         'macro_f1': f1_score(y_test, y_pred, average='macro'),
         'balanced_accuracy': balanced_accuracy_score(y_test, y_pred),
         'matthews_corrcoef': matthews_corrcoef(y_test, y_pred),
-        'roc_auc_ovr': roc_auc_score(y_test, y_probs)
+        'roc_auc_ovr': roc_auc_score(y_test, y_probs),
+        'accuracy': accuracy_score(y_test,y_pred)
     }
 
 # Obtener métricas a partir de un modelo y distintas semillas. También devuelve el modelo entrenado de cada semilla.
-def get_results(model,file,seeds,is_test=False,trial=None):
+def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path="",NO_TRAIN=False):
     results = []
-    models = {}
+
+    fit_t = []
 
     for seed in seeds:
         if trial is not None:
@@ -215,20 +231,35 @@ def get_results(model,file,seeds,is_test=False,trial=None):
         else:
             test_ds = pd.read_pickle(file+str(seed)+"eval.pkl")
         
-        X_trn = vstack(train_ds["vec"].to_list())
-        X_tst = vstack(test_ds["vec"].to_list())
+        X_trn = vstack(train_ds["vec"])
         Y_trn = train_ds["label"].astype("category")
+
+        X_tst = vstack(test_ds["vec"])
         Y_tst = test_ds["label"].astype("category")
-        
-        model.set_params(random_state=seed)
-        model.fit(X_trn,Y_trn)
+
+        if NO_TRAIN:
+            model = joblib.load(model_path+"/mseed"+str(seed)+".pkl")
+            fit_t.append(0)
+        else:
+            model.set_params(random_state=seed)
+
+            st = time.time()
+            model.fit(X_trn,Y_trn)
+            fit_t.append(time.time()-st)
+
         y_pred = model.predict(X_tst)
         y_probs = model.predict_proba(X_tst)[:,1]
 
-        models[seed] = model
+        if save and not NO_TRAIN:
+            Path(model_path).mkdir(parents=True, exist_ok=True)
+            joblib.dump(model, model_path+"/mseed"+str(seed)+".pkl")
+            print(f"Guardado modelo de semilla: {seed}")
+       
+       
         results.append(compute_metrics(Y_tst,y_pred,y_probs))
 
-    return results, models
+
+    return results, fit_t
 
 # Crea un vectorizador con el rango de ngram dado
 def make_vectorizer(ngram_range):
@@ -262,22 +293,39 @@ def optimize(study,objective,timeout):
     print(study.best_params)
     print(f"Mejor F1-Macro: {study.best_value:.4f}")
 
-# Usa los mejores parámetros del estudio pasado y evalua el conjunto de datos de test o evaluación
-# Dejar use_test en True si se quieren usar los conjuntos de datos de test, dejar en False si se quiere usar los de evaluación
-def test_study(study,model,file,seeds,use_test):
+def printtest(seeds,results,times,metric_names):
 
-    param_grid = study.best_params # Copiamos parámetros desde estudio
+    print("\n" + "="*30)
+    print("RESULTADOS POR SEMILLA")
+    print("="*30)
 
-    model.set_params(**param_grid) # Cargamos mejores parámetros
-    results, models = get_results(model,file,seeds,is_test=use_test)
+    for i,seed in enumerate(seeds):
+        print(f"Semilla: {seed}")
+        for m in metric_names:
+            values = [r[m] for r in results]
+            print(f"    {m}: {values[i]:.4f}")
+        print(f"    Tiempo de entrenamiento: {timedelta(milliseconds=int(times[i]*1000))}")
     
     print("\n" + "="*30)
     print("RESULTADOS FINALES")
     print("="*30)
 
-    metric_names = ['macro_f1', 'balanced_accuracy', 'matthews_corrcoef', 'roc_auc_ovr']
+
     for m in metric_names:
         values = [r[m] for r in results]
         print(f"{m}: {np.mean(values):.4f} (+/- {np.std(values):.4f})")
+    print(f"Tiempo de entrenamiento medio: {timedelta(milliseconds=int(np.mean(times)*1000))}s (+/- {np.std(times):.4f}s)")
 
-    return models
+# Usa los mejores parámetros del estudio pasado y evalua el conjunto de datos de test o evaluación
+# Dejar use_test en True si se quieren usar los conjuntos de datos de test, dejar en False si se quiere usar los de evaluación
+def test_study(study,model,file,seeds,use_test,save=False,model_path="",NO_TRAIN=False):
+
+    param_grid = study.best_params # Copiamos parámetros desde estudio
+
+    model.set_params(**param_grid) # Cargamos mejores parámetros
+    results, times = get_results(model,file,seeds,is_test=use_test,save=save,model_path=model_path,NO_TRAIN=NO_TRAIN)
+    
+    metric_names = ['macro_f1', 'balanced_accuracy', 'matthews_corrcoef', 'roc_auc_ovr']
+
+    printtest(seeds,results,times,metric_names)
+    

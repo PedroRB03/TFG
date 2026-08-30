@@ -7,7 +7,7 @@ from warnings import simplefilter
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Se deben especificar ruta y nombre del estudio en este orden.")
+        print("Se deben especificar ruta y nombre del estudio respectivamente.")
     else:
         simplefilter("ignore", category=optuna.exceptions.ExperimentalWarning)
      
@@ -22,7 +22,9 @@ if __name__ == "__main__":
         c_dur, p_dur = df[df.state == 'COMPLETE']['sec'], df[df.state == 'PRUNED']['sec']
 
         print(f"Trials: {len(study.trials)} | Pruned: {len(p_dur)} | Mejor F1: {study.best_value:.4f}")
-        print(f"Duración media Complete: {timedelta(seconds=round(c_dur.mean() or 0))} | Pruned: {timedelta(seconds=round(p_dur.mean() or 0))} | Tiempo Total: {timedelta(seconds=round(df['sec'].sum()))}")
+        p_mean = p_dur.mean()
+        c_mean = c_dur.mean()
+        print(f"Duración media Complete: {timedelta(seconds=round(c_mean if len(c_dur) > 0 else 0))} | Pruned: {timedelta(seconds=round(p_mean if len(p_dur) > 0 else 0))} | Tiempo Total: {timedelta(seconds=round(df['sec'].sum()))}")
         print(f"Mejores parámetros: {study.best_params}")
 
         optuna_plt.plot_optimization_history(study)
