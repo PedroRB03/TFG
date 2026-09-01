@@ -14,14 +14,14 @@ from transformers.utils import logging as hf_logging
 from sklearn.metrics import f1_score,balanced_accuracy_score, matthews_corrcoef, accuracy_score
 import time
 
-# Sustituye URLs y menciones a usuarios por tokens correspondientes. Elimina formateo de texto como tipo <b><\b> y &amp;
+# Sustituye URLs y menciones a usuarios por tokens correspondientes. Elimina formateo de texto como tipo <b><\b> y &amp; .
 def light_normalize_text(text):
-    text = re.sub(r'(\[.*\]\(.*\))|(<URL>)|(http[^\s]+)|(https[^\s]+)', '[URL]', text) # Formateo de URLs
-    text = re.sub(r'(@\w+)|(<USER>)', '[USER]', text) # Formateo usuarios
+    text = re.sub(r'(\[.*\]\(.*\))|(<URL>)|(http[^\s]+)|(https[^\s]+)', '[URL]', text) # Formateo de URLs.
+    text = re.sub(r'(@\w+)|(<USER>)', '[USER]', text) # Formateo usuarios.
     text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)','', text)
     return text
 
-# Aplica función sigmoide para normalización
+# Aplica función sigmoide para normalización.
 def sigmoid(arr):
     return 1/(1 + np.exp(-arr))
 
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     f_path = Path(args.input)
 
-    ## Validación del input
+    ## VALIDACIÓN DEL INPUT
     if not f_path.is_file():
         print("Archivo no encontrado.")
         exit(0)
@@ -66,7 +66,7 @@ if __name__ == "__main__":
         exit(0)
     ##
     
-    ## FORMACIÓ DEL DATAFRAME
+    ## FORMACIÓN DEL DATAFRAME
     if ext == '.csv':
         df = pd.read_csv(f_path, header=None)
         df.columns = ['txt']
@@ -95,13 +95,13 @@ if __name__ == "__main__":
     if args.model in ["lgbm","all"]:
         lgbm = joblib.load(lgbm_file)
         lgbm_v = joblib.load(lgbm_vfile)
-        warnings.filterwarnings("ignore", message="X does not have valid feature names") # Filtra advertencias
+        warnings.filterwarnings("ignore", message="X does not have valid feature names") # Filtra advertencias.
     if args.model in ["svm","all"]:
         svm = joblib.load(svm_file)
         svm_v = joblib.load(svm_vfile)
     if args.model in ["bert","all"]:
 
-        if not SHOW_LOAD_REPORT: # Ocultar mensaje de carga del modelo
+        if not SHOW_LOAD_REPORT: # Ocultar mensaje de carga del modelo.
             hf_logging.set_verbosity_error()
         bert = AutoModelForSequenceClassification.from_pretrained(bert_file)
         _,bert_v = get_tokenizer(bertv_file) 
@@ -110,13 +110,13 @@ if __name__ == "__main__":
 
     ## OBTENCIÓN DE PREDICCIONES
 
-    # Obtenemos predicciones para modelos scikit
+    # Obtenemos predicciones para modelos scikit.
     def _get_r(model,vec):
         ret = None
         if model:
             st = time.time_ns()
-            msgv = vec.transform(df["txt"])
-            p = model.predict_proba(msgv)
+            msgv = vec.transform(df["txt"]) # Vectorizamos.
+            p = model.predict_proba(msgv) # Obtenemos probabilidades.
             p_w = np.max(p,axis=1)
             r = np.argmax(p, axis=1)
             t = time.time_ns()-st
@@ -127,19 +127,19 @@ if __name__ == "__main__":
     lgbm_r = _get_r(lgbm,lgbm_v)
     svm_r = _get_r(svm,svm_v)
 
-    # Predicciones de DeBERTaV3
+    # Predicciones de DeBERTaV3.
     bert_r = None
     if bert:
         trainer = Trainer(model=bert)
 
         bdf = Dataset.from_pandas(df[['txt']])
         st = time.time_ns()
-        msgv = bdf.map(bert_v, batched=True)
+        msgv = bdf.map(bert_v, batched=True) # Tokenización por lotes.
         out = trainer.predict(msgv)
         logits = out.predictions
         t = time.time_ns()-st
 
-        if logits.shape[1] > 1:
+        if logits.shape[1] > 1: # Para crisp.
             st = time.time_ns()
             probs = softmax(logits, axis=-1)
             r = np.argmax(logits, axis=-1)
@@ -147,15 +147,15 @@ if __name__ == "__main__":
             t+= time.time_ns()-st
 
             bert_r = (r,p,t)
-        else:
+        else: # Para fuzzy.
             st = time.time_ns()
             probs = logits.squeeze()
-            r= np.round(probs).astype(int)
-            r = np.clip(r, 0, 1)
+            r= np.round(probs).astype(int) # Redondeo para obtener 0 o 1.
+            r = np.clip(r, 0, 1) # Aseguramos rango [0,1].
             p = sigmoid(probs)
             t+= time.time_ns()-st
 
-            bert_r = (r,p,t) # Se utiliza la función sigmoide para colocar logits entre 0 y 1
+            bert_r = (r,p,t) # Se utiliza la función sigmoide para colocar logits entre 0 y 1.
     ##
 
 
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     def _showres(res,l,i):
         if res:
             r = res[0][i]
-            if args.proba:
+            if args.proba: # Si se quiere mostrar probabilidades.
                     print(f" {l}: ({_nominal(r)},{res[1][i]*100:.2f}%)",end="")
             else:
                     print(f" {l}: ({_nominal(r)})",end="")

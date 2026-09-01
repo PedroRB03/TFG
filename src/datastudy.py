@@ -15,16 +15,16 @@ from math import inf
 from bertcore import get_tokenizer
 from datasets import Dataset
 
-# Muestra los diagramas mientras se calculan, pero pausa el flujo del programa hasta que se cierren
+# Muestra los diagramas mientras se calculan, pero pausa el flujo del programa hasta que se cierren.
 SHOW = False
 
-# Descargar stopwords
+# Descargar stopwords.
 nltk.download("stopwords", quiet=True)
 nltk.download('punkt')
 nltk.download('punkt_tab')
 
 
-# Muestra la frecuencia por clase
+# Muestra la frecuencia por clase.
 def stats_nclass(df):
     t = len(df['label'])
     print("="*10 + "Frecuencias por clase" + "="*10)
@@ -36,7 +36,7 @@ def stats_nclass(df):
         print(f'{c} & {n} & {n/t*100:.2f}\\% \\\\ \\hline')
     print("\\end{tabular}")
 
-# Muestra ejemplos por clase de cada jurado
+# Muestra ejemplos por clase de cada jurado.
 def stats_bars(df,pret):
     j_bars = ['a1','a2','a3','label']
     j_title = ['Jurado 1', 'Jurado 2', 'Jurado 3', 'Mayoría']
@@ -53,11 +53,11 @@ def stats_bars(df,pret):
 
             
 
-# Muestra Fleiss's Kappa
+# Muestra Fleiss's Kappa.
 def stats_fleissk(df):
     cats = df['label'].unique()
     j_cols = ['a1', 'a2', 'a3']
-    c = df[j_cols].apply(lambda x: x.map({cat: i for i, cat in enumerate(cats)})).values # Reemplazamos categorías por números
+    c = df[j_cols].apply(lambda x: x.map({cat: i for i, cat in enumerate(cats)})).values # Reemplazamos categorías por números.
     mat = np.zeros((len(df), len(cats)))
     for i, row in enumerate(c):
         for val in row:
@@ -65,7 +65,7 @@ def stats_fleissk(df):
     print("="*10 + "Fleiss's Kappa" + "="*10)
     print(f"Fleiss's Kappa: {fleiss_kappa(mat):.3f}")
 
-# Muestra matriz de confusión de juez vs mayoría
+# Muestra matriz de confusión de juez vs mayoría.
 def stats_confmat(df,pret):
     j_cols = ['a1', 'a2', 'a3']
     for i,j in enumerate(j_cols):
@@ -80,7 +80,7 @@ def stats_confmat(df,pret):
             plt.clf()
 
 
-# Calcula valores atípicos
+# Calcula valores atípicos.
 def _outliers(df,col='char_len'):
     Q1 = df[col].quantile(0.25)
     Q3 = df[col].quantile(0.75)
@@ -89,9 +89,8 @@ def _outliers(df,col='char_len'):
     lsup = Q3 + 1.5 * IQR
     return ((df[col] < linf) | (df[col] > lsup))
 
-# Muestra la cantidad de valores atípicos por clase
+# Muestra la cantidad de valores atípicos por clase.
 def stats_outliers(df):
-    df['char_len'] = df['txt'].astype(str).str.len()
     df['char_len'] = df['txt'].astype(str).str.len()
     print("Mínima longitud de texto: ", df['char_len'].min())
     print("Máxima longitud de texto: ", df['char_len'].max())
@@ -104,9 +103,9 @@ def stats_outliers(df):
 
 
     for c, grp in df.groupby("label"):
-        s = _outliers(grp)
-        outl = grp[s]
-        inl = grp[s == False]
+        s = _outliers(grp) # Obtenemos valores atípicos.
+        outl = grp[s] # Valores atípicos
+        inl = grp[s == False] # Valores típicos
         n = len(outl)
         tot = len(grp)
         print(f'{c} & {n} & {n/tot*100:.2f}\\% & [{outl['char_len'].min()}-{outl['char_len'].max()}] & [{inl['char_len'].min()}-{inl['char_len'].max()}]\\\\ \\hline')
@@ -115,19 +114,19 @@ def stats_outliers(df):
     print("\\end{tabular}")
 
 
-# Muestra diagrama de cajas y bigotes de la longitud de los ejemplares
+# Muestra diagrama de cajas y bigotes de la longitud de los ejemplares.
 def stats_boxplot(df,pret,fit):
     df['char_len'] = df['txt'].astype(str).str.len()
 
     y_min = inf
     y_max = -inf
-    for c, grp in df.groupby("label"):
+    for _, grp in df.groupby("label"):
         s = _outliers(grp)
         noutl = grp[s == False]
         y_min = min(y_min,noutl['char_len'].min())
         y_max = max(y_max,noutl['char_len'].max())
 
-    margen = (y_max - y_min)* 0.05
+    margen = (y_max - y_min)* 0.05 # Obtenemos margen en el que ajustar la gráfica si fit = True.
 
     ax = sns.boxplot(x='label', y='char_len', data=df) #,ax=ax[0])
     ax.set_xlabel("Clase")
@@ -145,7 +144,7 @@ def stats_boxplot(df,pret,fit):
         plt.clf()
 
 
-# Muestra una nube de palabras donde las palabras más frecuentes son las más grandes
+# Muestra una nube de palabras donde las palabras más frecuentes son las más grandes.
 def stats_wordcloud(df,pret):
     trolling_text = " ".join(df[df['label'] == 'Trolling']['txt']).lower()
     if trolling_text:
@@ -161,10 +160,11 @@ def stats_wordcloud(df,pret):
             plt.savefig(pret+"wcloud.png")
             plt.clf()
 
+# Muestra tablas con frecuencia de cada palabra.
 def stats_freqword(df,N,per_row):
     stop_words = set(stopwords.words("english"))
 
-    if per_row:
+    if per_row: # Si se limita a una palabra por fila, obtenemos la columna de texto con una palabra por fila.
         df["txt_unique"] = df["txt"].apply(lambda x: " ".join(set(str(x).lower().split())))
     
     for c, grp in df.groupby("label"):
@@ -176,10 +176,10 @@ def stats_freqword(df,N,per_row):
         else:
             txt = " ".join(grp["txt"].dropna().astype(str)).lower()
         
-        # Tokenización de NLTK
+        # Tokenización de NLTK.
         tokens = word_tokenize(txt, language="english")
 
-        # Filtrar solo palabras alfanuméricas y stopwords
+        # Filtrar solo palabras alfanuméricas y stopwords.
         wrds = [
             word for word in tokens if word.isalnum() and word not in stop_words
         ]
@@ -195,7 +195,7 @@ def stats_freqword(df,N,per_row):
         print("\\end{table}")
 
 
-# Obtiene cantidad de filas duplicadas
+# Obtiene cantidad de filas duplicadas.
 def getdupes(df):
     return len(df['txt'])-len(df['txt'].drop_duplicates())
 
@@ -207,58 +207,59 @@ if __name__ == "__main__":
     STUDY_OUT = params["DATAGEN"]["STUDY_OUT"]
     MODEL_NAME = params["BERT"]["MODEL_NAME"]
     ##
-    Path(STUDY_OUT).mkdir(parents=True, exist_ok=True) # Creamos ruta si no existe
+
+    Path(STUDY_OUT).mkdir(parents=True, exist_ok=True) # Creamos ruta donde guardar tablas y gráficos si no existe.
     
     sns.set_theme(style="whitegrid")
 
     def _statshow(filter,pret):
-        # Leemos archivo
+        # Leemos archivo.
         df = pd.read_excel(FILE)
     
-        # Cambios nombres de las columnas por comodidad
+        # Cambios nombres de las columnas por comodidad.
         df.columns = ['txt','a1','a2','a3','label']
         allowed = ["Normal","Trolling"]
         
         
-        # Normalizamos texto
+        # Normalizamos texto.
         print("="*10 + "Filas duplicadas" + "="*10)
         print("Duplicados pre-normalización: ", getdupes(df))
         df['txt'] = df['txt'].apply(lambda x: normalize_text(str(x)))
         print("Duplicados post-normalización: ", getdupes(df))
 
         if filter:
-            df = df[df['a1'].isin(allowed) & df['a2'].isin(allowed) & df['a3'].isin(allowed)] # Quitamos clases no contempladas
+            df = df[df['a1'].isin(allowed) & df['a2'].isin(allowed) & df['a3'].isin(allowed)] # Quitamos clases no contempladas.
             
-        # Quitamos duplicados
+        # Quitamos duplicados.
         df = df.drop_duplicates(subset=['txt'],keep=False,ignore_index=True) 
 
 
-        # Número de ejemplos de cada clase
+        # Número de ejemplos de cada clase.
         stats_nclass(df)
 
 
-        # Distribución de clases por jurado
+        # Distribución de clases por jurado.
         stats_bars(df,pret)
-        # Fleiss K
+        # Fleiss K.
         stats_fleissk(df)
-        # Jurado vs Popular, matriz de confusión
+        # Jurado vs Popular, matriz de confusión.
         stats_confmat(df,pret)
-        # Diagrama de caja y bigotes
+        # Diagrama de caja y bigotes.
         stats_outliers(df)
         stats_boxplot(df,pret,fit=False)
         stats_boxplot(df,pret,fit=True)
-        # Frecuencia de palabras
+        # Frecuencia de palabras.
         print("="*20 + "Frecuencia de palabras total" + "="*20)
         stats_freqword(df,20,False)
         print("")
         print("="*20 + "Frecuencia de palabras, una por fila" + "="*20)
         stats_freqword(df,20,True)
 
-        # Word Cloud
+        # Word Cloud.
         stats_wordcloud(df,pret)
 
     oout = sys.stdout
-    # Guardamos salida en un archivo
+    # Guardamos salida en un archivo.
     sys.stdout = open(STUDY_OUT+'/datastats.txt', 'w')
 
     print("="*40)

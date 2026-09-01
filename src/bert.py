@@ -31,12 +31,12 @@ if __name__ == "__main__":
    
 
 
-    # Calculamos ruta de los datos a usar en función del parámetro FUZZY
+    # Calculamos ruta de los datos a usar en función del parámetro FUZZY.
     u_file = FILE 
     if FUZZY:
         u_file = FILE_F
 
-    # Función para buscar hiperparámetros
+    # Función para buscar hiperparámetros.
     def objective(trial: optuna.Trial):
 
         param_grid = {
@@ -46,25 +46,25 @@ if __name__ == "__main__":
             'weight_decay' : trial.suggest_int("weight_decay", 0.01 , 0.1),
             'gradient_accumulation_steps' : trial.suggest_categorical("gradient_accumulation_steps",[1,2,4,8])
         }
-        
+        # Se obtienen las métricas por semilla.
         results, _ = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST=False,SAVE_MODEL=False,BALANCED_CW=BALANCED_CW,FUZZY_BAL_CRISP=FUZZY_BAL_CRISP,MODEL_NAME=MODEL_NAME,trial=trial,tmodel_name=MODEL_NAME)
         
         values = [r["eval_macro_f1"] for r in results]
         
         return np.mean(values)
 
-    if not SHOW_LOAD_REPORT: # Ocultar mensaje de carga del modelo
+    if not SHOW_LOAD_REPORT: # Ocultar mensaje de carga del modelo.
         hf_logging.set_verbosity_error()
 
 
     pruner = optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=2)
-    # Se obtiene o crea estudio a partir de base de datos sqllite
+    # Se obtiene o crea estudio a partir de base de datos SQLite.
     study = optuna.create_study(direction='maximize',study_name=OPT_STUDY,storage=OPT_DB,load_if_exists=True, pruner=pruner)
 
 
-    if OPT_TIME > 0 and not NO_TRAIN: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos
+    if OPT_TIME > 0 and not NO_TRAIN: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos.
         optimize(study,objective,OPT_TIME)
-    else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
+    else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada).
         if NO_TRAIN:
             testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name=LOCAL_MODEL_DIR,NO_TRAIN=True,tmodel_name=MODEL_NAME)
         else:

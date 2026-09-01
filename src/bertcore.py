@@ -15,15 +15,15 @@ from optuna import TrialPruned
 from common import should_prune, get_class_weights, printtest
 import time
 
-# Función para calcular métricas
+# Función para calcular métricas.
 def compute_metrics(FUZZY, eval_pred):
     logits, labels = eval_pred
 
     if FUZZY:
         probs = logits.squeeze()
-        predictions= np.round(probs).astype(int)
+        predictions= np.round(probs).astype(int) # Redondeamos probabilidades.
         labels = np.round(labels).astype(int)
-        predictions = np.clip(predictions, 0, 1) # Por si acaso, aseguramos el rango [0,1]
+        predictions = np.clip(predictions, 0, 1) # Aseguramos el rango [0,1].
         roc_auc = roc_auc_score(labels, probs) 
 
     else:
@@ -39,14 +39,14 @@ def compute_metrics(FUZZY, eval_pred):
         'accuracy': accuracy_score(labels, predictions),
     }
 
-# Permite entrenar el modelo con los parámetros dados y muestra una media de las métricas de evaluación
+# Permite entrenar el modelo con los parámetros dados y muestra una media de las métricas de evaluación.
 def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name="microsoft/deberta-v3-small",NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
     
-    param_grid = study.best_params # Cargamos mejores parámetros
+    param_grid = study.best_params # Cargamos mejores hiperparámetros.
 
     results, times = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name,NO_TRAIN=NO_TRAIN,tmodel_name=tmodel_name)
 
-    metric_names = ['eval_macro_f1', 'eval_balanced_accuracy', 'eval_matthews_corrcoef', 'eval_roc_auc_ovr']
+    metric_names = ['eval_macro_f1', 'eval_balanced_accuracy', 'eval_matthews_corrcoef', 'eval_roc_auc_ovr','eval_accuracy']
 
     
     printtest(SEEDS,results,times,metric_names)
@@ -57,7 +57,7 @@ def obtain_tokenized(tokenize_function, u_file, seed):
     eval_ds = pd.read_pickle(u_file+str(seed)+"eval.pkl")
     test_ds = pd.read_pickle(u_file+str(seed)+"test.pkl")
 
-    # Eliminamos columnas con texto pasado por TF-IDF
+    # Eliminamos columnas con texto pasado por TF-IDF.
     train_ds.drop(columns=["vec"], inplace=True)
     eval_ds.drop(columns=["vec"], inplace=True)
     test_ds.drop(columns=["vec"], inplace=True)
@@ -76,13 +76,13 @@ def obtain_tokenized(tokenize_function, u_file, seed):
 def weighted_compute_loss(class_weights, outputs, labels, num_items_in_batch=None):
     logits = outputs.logits
 
-    # Fuzzy (num_labels == 1)
+    # Fuzzy (num_labels == 1).
     if logits.shape[-1] == 1:
 
-        label_idx = torch.bucketize( # Calculamos a qué peso de clase le corresponde cada ejemplar
+        label_idx = torch.bucketize( # Calculamos a qué peso de clase le corresponde cada ejemplar.
             labels,
-            boundaries=torch.tensor([0.165, 0.495, 0.83], device=labels.device) # [(0+0.33)/2,(0.33+0.66)/2,(0.66+1)/2]
-            # Usamos intervalos para asignar pesos de clase ya que tenemos valores continuos
+            boundaries=torch.tensor([0.165, 0.495, 0.83], device=labels.device) # [(0+0.33)/2,(0.33+0.66)/2,(0.66+1)/2].
+            # Usamos intervalos para asignar pesos de clase ya que tenemos valores continuos.
         )
         sample_weights = class_weights.to(labels.device)[label_idx]
         
@@ -95,7 +95,7 @@ def weighted_compute_loss(class_weights, outputs, labels, num_items_in_batch=Non
 
     return loss
 
-# Devuelve la clase Tokenizer correspondiente al modelo y una función para obtener tokens
+# Devuelve la clase Tokenizer correspondiente al modelo y una función para obtener tokens.
 def get_tokenizer(model_name):
 
     tokenizer = AutoTokenizer.from_pretrained(model_name,
@@ -108,12 +108,12 @@ def get_tokenizer(model_name):
 
     return tokenizer, tokenize_function
 
-# Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación
+# Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación.
 def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=False,MODEL_NAME = "microsoft/deberta-v3-small",trial=None,NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
 
     tokenizer, tokenize_function = get_tokenizer(tmodel_name)
 
-    results = [] # Resultados de cada semilla
+    results = [] # Resultados de cada semilla.
 
     fit_t = []
     model_name = MODEL_NAME
@@ -130,13 +130,13 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
 
         set_seed(seed) 
 
-        t_train, t_eval, t_test = obtain_tokenized(tokenize_function,u_file,seed) # datasets tokenizados
+        t_train, t_eval, t_test = obtain_tokenized(tokenize_function,u_file,seed) # Datasets tokenizados.
 
         dname = RESULTS+"/seed"+str(seed)
-        Path(dname).mkdir(parents=True, exist_ok=True) # Creamos ruta si no existe
+        Path(dname).mkdir(parents=True, exist_ok=True) # Creamos ruta si no existe.
 
-        shutil.rmtree(dname) # Borramos directorio y archivos donde se guardan los checkpoints
-        os.mkdir(dname) # Lo volvemos a crear
+        shutil.rmtree(dname) # Borramos directorio y archivos donde se guardan los checkpoints.
+        os.mkdir(dname) # Lo volvemos a crear.
 
         if NO_TRAIN:
             model_name = MODEL_NAME+"/bert_model"+str(seed)
@@ -147,7 +147,7 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2,dtype=torch.float32)
         model.resize_token_embeddings(len(tokenizer))
         
-        # Hiperparámetros
+        # Hiperparámetros.
         training_args = TrainingArguments(
             output_dir=dname,
             eval_strategy='epoch',
@@ -169,10 +169,10 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
         
         callbacks = []
 
-        if EARLY_STOP > 0: # Si EARLY_STOP no es cero, incluimos el callback
+        if EARLY_STOP > 0: # Si EARLY_STOP no es cero, incluimos el callback.
             callbacks = [EarlyStoppingCallback(early_stopping_patience=EARLY_STOP)]
 
-        if BALANCED_CW: # Calculamos pesos de clase
+        if BALANCED_CW: # Calculamos pesos de clase.
             class_weights = get_class_weights(t_train["label"], FUZZY_BAL_CRISP) 
             class_weights = torch.tensor(class_weights, dtype=torch.float)
             
@@ -201,7 +201,7 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             print(f"Modelo guardado en semilla {seed}.")
         
 
-        if USE_TEST: # Calcula métricas con datos de test o evaluación
+        if USE_TEST: # Calcula métricas con datos de test o evaluación.
             eval_stats = trainer.evaluate(eval_dataset=t_test)
         else:
             eval_stats = trainer.evaluate(eval_dataset=t_eval)

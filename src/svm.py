@@ -3,7 +3,6 @@ from sklearn import svm
 import numpy as np
 from common import get_results, optimize, test_study, make_vectorizer, get_params
 import sys
-import joblib
 from pathlib import Path
 
 if __name__ == "__main__":
@@ -32,9 +31,8 @@ if __name__ == "__main__":
     )
 
 
-    # Función para buscar hiperparámetros
+    # Función para buscar hiperparámetros.
     def objective(trial):
-        #kernel = trial.suggest_categorical('kernel', ['linear', 'rbf', 'poly'])
 
         param_grid = {'C': trial.suggest_float('C', 1e-3, 1000,log=True)}
         
@@ -49,7 +47,8 @@ if __name__ == "__main__":
                 param_grid['gamma'] = trial.suggest_float('gamma', 1e-4, 10.0, log=True)
                 param_grid['coef0'] = trial.suggest_float('coef0', -10.0, 10.0, log=False)
 
-        model.set_params(**param_grid)
+        model.set_params(**param_grid) # Actualizamos hiperparámetros.
+        # Se obtienen las métricas por semilla.
         results ,_ = get_results(model,FILE,SEEDS,is_test=False,trial=trial)
 
         values = [r["macro_f1"] for r in results]
@@ -59,13 +58,13 @@ if __name__ == "__main__":
 
 
 
-    # Se obtiene o crea estudio a partir de base de datos sqllite
+    # Se obtiene o crea estudio a partir de base de datos SQLite.
     study = optuna.create_study(direction='maximize',study_name=OPT_STUDY,storage=OPT_DB,load_if_exists=True)
 
 
-    if OPT_TIME > 0: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos
+    if OPT_TIME > 0: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos.
         optimize(study,objective,OPT_TIME)
-    else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada)
+    else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada).
         if NO_TRAIN:
             models = test_study(study,model,FILE,SEEDS,USE_TEST,SAVE_MODEL,LOCAL_MODEL_DIR,NO_TRAIN=NO_TRAIN)
         else:

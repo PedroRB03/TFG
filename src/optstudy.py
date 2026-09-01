@@ -9,15 +9,15 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Se deben especificar ruta y nombre del estudio respectivamente.")
     else:
-        simplefilter("ignore", category=optuna.exceptions.ExperimentalWarning)
+        simplefilter("ignore", category=optuna.exceptions.ExperimentalWarning) # Quitamos advertencia de función experimental.
      
-        study = optuna.study.load_study(storage=sys.argv[1],study_name=sys.argv[2])
+        study = optuna.study.load_study(storage=sys.argv[1],study_name=sys.argv[2]) # Cargamos estudio existente.
 
         ctrials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
 
         print(f"=== RESUMEN DEL ESTUDIO ===")
 
-        df = study.trials_dataframe()
+        df = study.trials_dataframe() # DataFrame equivalente al estudio.
         df['sec'] = df['duration'].dt.total_seconds()
         c_dur, p_dur = df[df.state == 'COMPLETE']['sec'], df[df.state == 'PRUNED']['sec']
 

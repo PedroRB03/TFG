@@ -17,7 +17,7 @@ import joblib
 from imblearn.under_sampling import EditedNearestNeighbours, RandomUnderSampler
 from imblearn.over_sampling import SMOTE
 
-# Parámetros por defecto
+# Parámetros por defecto.
 PARAM_DEFAULTS = {
     "COMMON" : { 
         "SEEDS" : [600,601,602,603,604],   
@@ -78,23 +78,23 @@ PARAM_DEFAULTS = {
     },
 }
 
-# Carga los parámetros los devuelve en un diccionario
+# Carga los parámetros los devuelve en un diccionario.
 def get_params(fname="params.ini"):
     config = configparser.ConfigParser()
 
     res = {}
     config.read(fname)
         
-    for csec in ["COMMON","LGBM","SVM","BERT","DATAGEN"]: # Cada sección
+    for csec in ["COMMON","LGBM","SVM","BERT","DATAGEN"]: # Cada sección.
         if csec not in config.keys():
-            res[csec] = deepcopy(PARAM_DEFAULTS[csec]) # En caso de no encontrarse se pone el valor por defecto
+            res[csec] = deepcopy(PARAM_DEFAULTS[csec]) # En caso de no encontrarse se pone el valor por defecto.
         else:
             res[csec] = {}
-            for param in PARAM_DEFAULTS[csec].keys(): # Cada parámetro por sección
+            for param in PARAM_DEFAULTS[csec].keys(): # Cada parámetro por sección.
                 if param not in config[csec].keys():
-                    res[csec][param] = PARAM_DEFAULTS[csec][param] # En caso de no encontrarse se pone el valor por defecto
+                    res[csec][param] = PARAM_DEFAULTS[csec][param] # En caso de no encontrarse se pone el valor por defecto.
                 else:
-                    match PARAM_DEFAULTS[csec][param]: # Typecasting y carga de cada parámetro
+                    match PARAM_DEFAULTS[csec][param]: # Typecasting y carga de cada parámetro.
                         case float():
                             res[csec][param] = float(config[csec][param])
                         case bool():
@@ -108,20 +108,19 @@ def get_params(fname="params.ini"):
                                 res[csec][param].append(int(i))
                         case _:
                             res[csec][param] = config[csec][param]
-    #if res["DATAGEN"]["N"] == 0: # El parámetros N en concreto puede ser infinito
-    #    res["DATAGEN"]["N"] = inf
+   
     return res
 
 
 
-# Función de normalización de texto
+# Función de normalización de texto.
 def normalize_text(text):
-    text = re.sub(r'(\[.*\]\(.*\))|(<URL>)|(http[^\s]+)|(https[^\s]+)', '[URL]', text) # Formateo de URLs
-    text = re.sub(r'(@\w+)|(<USER>)', '[USER]', text) # Formateo usuarios
-    text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)|\[removed\]','', text) # He quitado <b><b\> y post eliminados
+    text = re.sub(r'(\[.*\]\(.*\))|(<URL>)|(http[^\s]+)|(https[^\s]+)', '[URL]', text) # Formateo de URLs.
+    text = re.sub(r'(@\w+)|(<USER>)', '[USER]', text) # Formateo usuarios.
+    text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)|\[removed\]','', text) # Quitado &amp;<b><b\> y post eliminados.
     return text
 
-# Esta función devuelve el índice del elemento más cercano al valor dado de una lista
+# Esta función devuelve el índice del elemento más cercano al valor dado de una lista.
 def _closest(v,l):
     i = 0
     fi = len(l)
@@ -134,7 +133,7 @@ def _closest(v,l):
         i+=1
     return fi
 
-# Devuelve los pesos de clase de la lista dada. Si FUZZY_BAL_CRISP=True, se redondean las etiquetas para el cálculo
+# Devuelve los pesos de clase de la lista dada. Si FUZZY_BAL_CRISP=True, se redondean las etiquetas para el cálculo.
 def get_class_weights(arr,FUZZY_BAL_CRISP=False):
 
     if FUZZY_BAL_CRISP: 
@@ -155,10 +154,10 @@ def get_class_weights(arr,FUZZY_BAL_CRISP=False):
 
     return class_weights
 
-# balancing puede ser None (Ninguna ténica de balanceo), RUS (RandomUnderSampler), ENN (EditedNearestNeighbours) o SMOTE
+# balancing puede ser None (Ninguna ténica de balanceo), RUS (RandomUnderSampler), ENN (EditedNearestNeighbours) o SMOTE.
 def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
     bal = None
-    match balancing: # Creamos clase correspondiente
+    match balancing: # Creamos clase correspondiente.
         case "RUS":
             bal = RandomUnderSampler(random_state=seed)
         case "ENN":
@@ -168,7 +167,7 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
 
     if bal:
         is_float = df['label'].dtype != 'int64'
-        if FUZZY_BAL_CRISP and balancing != "SMOTE": # Con SMOTE no usamos datos CRISP para balancear
+        if FUZZY_BAL_CRISP and balancing != "SMOTE": # Con SMOTE no usamos datos CRISP para balancear.
             y = (df['label']).round().astype(int)
         else:
             y = np.floor(df['label']*3).astype(int)
@@ -178,7 +177,7 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
 
         n_og = len(df)
         n_new = len(y_new)
-        if balancing == "SMOTE": # En caso de SMOTE, adjuntamos casos sintéticos al dataset principal
+        if balancing == "SMOTE": # En caso de SMOTE, adjuntamos casos sintéticos al dataset principal.
             if n_new > 0:
                 rng = np.random.default_rng(seed)
                 new_rows = {'txt':[],'label':[],'vec':[]}
@@ -190,7 +189,7 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
                         y_i = int(y_i)/3
                     vec_i = x_new[i]
                     cdf = df[df['label'] == y_i].reset_index(drop=True)
-                    txt_rng = cdf['txt'][rng.integers(0,len(cdf))] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar bert
+                    txt_rng = cdf['txt'][rng.integers(0,len(cdf))] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar BERT.
                     new_rows['txt'].append(txt_rng)
                     new_rows['label'].append(y_i)
                     new_rows['vec'].append(vec_i)
@@ -199,9 +198,9 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
         else:
             df = df.iloc[bal.sample_indices_]
     
-    return df.sample(frac=1,random_state=seed).reset_index(drop=True) # Barajamos una última vez
+    return df.sample(frac=1,random_state=seed).reset_index(drop=True) # Barajamos una última vez.
 
-# Calcular métricas a partir de resultados de un modelo SVM o LGBM
+# Calcular métricas a partir de resultados de un modelo SVM o LGBM.
 def compute_metrics(y_test,y_pred,y_probs):
     return {
         'macro_f1': f1_score(y_test, y_pred, average='macro'),
@@ -226,15 +225,15 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
             
 
         train_ds = pd.read_pickle(file+str(seed)+"train.pkl")
-        if is_test:
+        if is_test: # Utilizamos conjunto de evaluación o test dependiendo del parámetros is_test.
             test_ds = pd.read_pickle(file+str(seed)+"test.pkl")
         else:
             test_ds = pd.read_pickle(file+str(seed)+"eval.pkl")
         
-        X_trn = vstack(train_ds["vec"])
+        X_trn = vstack(train_ds["vec"]) # Formamos matriz dispersa.
         Y_trn = train_ds["label"].astype("category")
 
-        X_tst = vstack(test_ds["vec"])
+        X_tst = vstack(test_ds["vec"]) # Formamos matriz dispersa.
         Y_tst = test_ds["label"].astype("category")
 
         if NO_TRAIN:
@@ -261,15 +260,15 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
 
     return results, fit_t
 
-# Crea un vectorizador con el rango de ngram dado
+# Crea un vectorizador con el rango de ngram dado.
 def make_vectorizer(ngram_range):
-    return TfidfVectorizer( # Vectorizador
+    return TfidfVectorizer( # Vectorizador.
         ngram_range=ngram_range,    
         stop_words="english",
         #lowercase=True
     )
 
-# Obtiene una media optimista en mitad de un trial de Optuna y decide si se debería podar el intento 
+# Obtiene una media optimista en mitad de un trial de Optuna y decide si se debería podar el intento.
 def should_prune(trial,results,n,eval_name='macro_f1'):
     try:
         bf1 = trial.study.best_value
@@ -284,8 +283,8 @@ def should_prune(trial,results,n,eval_name='macro_f1'):
         med+=1
     return med/n < bf1
 
-# Busca los mejores parámetros para el estudio y pipeline pasado
-# Necesita una función objective que acepte el pipeline como primer parámetro
+# Busca los mejores parámetros para el estudio y pipeline pasado.
+# Necesita una función objective que acepte el pipeline como primer parámetro.
 def optimize(study,objective,timeout):
     study.optimize(objective, timeout=timeout)
 
@@ -293,6 +292,7 @@ def optimize(study,objective,timeout):
     print(study.best_params)
     print(f"Mejor F1-Macro: {study.best_value:.4f}")
 
+# Dada una semilla, los resultados, tiempos y nombres de métricas, las muestra por pantalla.
 def printtest(seeds,results,times,metric_names):
 
     print("\n" + "="*30)
@@ -316,16 +316,16 @@ def printtest(seeds,results,times,metric_names):
         print(f"{m}: {np.mean(values):.4f} (+/- {np.std(values):.4f})")
     print(f"Tiempo de entrenamiento medio: {timedelta(milliseconds=int(np.mean(times)*1000))}s (+/- {np.std(times):.4f}s)")
 
-# Usa los mejores parámetros del estudio pasado y evalua el conjunto de datos de test o evaluación
-# Dejar use_test en True si se quieren usar los conjuntos de datos de test, dejar en False si se quiere usar los de evaluación
+# Usa los mejores parámetros del estudio pasado y evalua el conjunto de datos de test o evaluación.
+# Dejar use_test en True si se quieren usar los conjuntos de datos de test, dejar en False si se quiere usar los de evaluación.
 def test_study(study,model,file,seeds,use_test,save=False,model_path="",NO_TRAIN=False):
 
-    param_grid = study.best_params # Copiamos parámetros desde estudio
+    param_grid = study.best_params # Copiamos parámetros desde estudio.
 
-    model.set_params(**param_grid) # Cargamos mejores parámetros
+    model.set_params(**param_grid) # Cargamos mejores parámetros.
     results, times = get_results(model,file,seeds,is_test=use_test,save=save,model_path=model_path,NO_TRAIN=NO_TRAIN)
     
-    metric_names = ['macro_f1', 'balanced_accuracy', 'matthews_corrcoef', 'roc_auc_ovr']
+    metric_names = ['macro_f1', 'balanced_accuracy', 'matthews_corrcoef', 'roc_auc_ovr','accuracy']
 
     printtest(seeds,results,times,metric_names)
     
