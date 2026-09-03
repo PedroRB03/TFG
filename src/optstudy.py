@@ -26,7 +26,7 @@ if __name__ == "__main__":
         c_mean = c_dur.mean()
         print(f"Duración media Complete: {timedelta(seconds=round(c_mean if len(c_dur) > 0 else 0))} | Pruned: {timedelta(seconds=round(p_mean if len(p_dur) > 0 else 0))} | Tiempo Total: {timedelta(seconds=round(df['sec'].sum()))}")
         print(f"Mejores parámetros: {study.best_params}")
-
+       
         optuna_plt.plot_optimization_history(study)
         plt.title("Evolución del F1 Score")
         plt.show()

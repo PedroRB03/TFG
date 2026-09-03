@@ -86,7 +86,7 @@ if __name__ == "__main__":
     
     #if args.limit != '':
     #    df = df.head(int(args.limit))
-    
+
     ##
 
     ## CARGA DE MODELOS
@@ -141,9 +141,11 @@ if __name__ == "__main__":
 
         bdf = Dataset.from_pandas(df[['txt']])
         msgv = bdf.map(bert_v, batched=True) # Tokenización por lotes.
+        
         st = time.time_ns()
         out = trainer.predict(msgv)
         t = time.time_ns()-st
+
         logits = out.predictions
 
         if logits.shape[1] > 1: # Para crisp.

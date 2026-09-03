@@ -33,7 +33,7 @@ if __name__ == "__main__":
             'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
             'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
             'num_leaves': trial.suggest_int('num_leaves', 20, 150),
-            'max_depth': trial.suggest_int('max_depth', -0, 12),
+            'max_depth': trial.suggest_int('max_depth', 0, 12),
             'min_child_samples': trial.suggest_int('min_child_samples', 5, 100),
             'subsample_freq': trial.suggest_int('subsample_freq', 0, 10),
             'colsample_bytree': trial.suggest_float('colsample_bytree', 0.4, 1.0),

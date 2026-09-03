@@ -42,7 +42,6 @@ if __name__ == "__main__":
             'learning_rate' : trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True),
             'num_train_epochs' : trial.suggest_int("num_train_epochs", 1 , 4),
             'warmup_steps' : trial.suggest_int("warmup_steps", 100 , 600),
-            'weight_decay' : trial.suggest_int("weight_decay", 0.01 , 0.1),
             'gradient_accumulation_steps' : trial.suggest_categorical("gradient_accumulation_steps",[1,2,4,8])
         }
         # Se obtienen las métricas por semilla.

@@ -158,7 +158,6 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             learning_rate=param_grid['learning_rate'],
             num_train_epochs=param_grid['num_train_epochs'],
             warmup_steps=param_grid['warmup_steps'],
-            weight_decay=param_grid['weight_decay'],
             logging_steps=100,
             seed=seed,
             data_seed=seed,
