@@ -32,7 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("input",help='Ruta al archivo csv o pkl con un mensaje por fila.')
     parser.add_argument("-m","--model",required=True,help="Modelo a utilizar.",choices=['lgbm','svm','bert','all'])
     parser.add_argument("-c","--config",default='params.ini',help="Especifica ruta al archivo de configuración.")
-    parser.add_argument("-l","--limit",default='',help="Limita el número de muestras a las n primeras.")
+    #parser.add_argument("-l","--limit",default='',help="Limita el número de muestras a las n primeras.")
     parser.add_argument("-p","--proba",action='store_true',help="Muestra el grado de pertenencia a la clase ganadora.")
     parser.add_argument("-t","--time",action='store_true',help="Muestra tiempo tardado en clasificar por muestra y medio.")
 
@@ -84,8 +84,9 @@ if __name__ == "__main__":
 
     df["txt"] = df["txt"].apply(lambda x: light_normalize_text(str(x)))
     
-    if args.limit != '':
-        df = df.head(int(args.limit))
+    #if args.limit != '':
+    #    df = df.head(int(args.limit))
+    
     ##
 
     ## CARGA DE MODELOS

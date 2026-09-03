@@ -117,8 +117,11 @@ if __name__ == "__main__":
 
             # Guardamos vectorizador y conjuntos de entrenamiento, validación y test.
             joblib.dump(tfidf, VFILE+tfidfp+str(seed)+".pkl")
+            print(f"Guardando conjunto de entrenamiento con {len(df_tr)} filas ({len(df_tr[df_tr["label"].round() == 0])} Normal y {len(df_tr[df_tr["label"].round() == 1])} Trolling).")
             df_tr.to_pickle(f_path+str(seed)+"train.pkl")
+            print(f"Guardando conjunto de validación con {len(df_ev)} filas ({len(df_ev[df_ev["label"].round() == 0])} Normal y {len(df_ev[df_ev["label"].round() == 1])} Trolling).")
             df_ev.to_pickle(f_path+str(seed)+"eval.pkl")
+            print(f"Guardando conjunto de test con {len(df_tst)} filas ({len(df_tst[df_tst["label"].round() == 0])} Normal y {len(df_tst[df_tst["label"].round() == 1])} Trolling).")
             df_tst.to_pickle(f_path+str(seed)+"test.pkl")
   
 

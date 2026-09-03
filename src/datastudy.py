@@ -39,7 +39,7 @@ def stats_nclass(df):
 # Muestra ejemplos por clase de cada jurado.
 def stats_bars(df,pret):
     j_bars = ['a1','a2','a3','label']
-    j_title = ['Jurado 1', 'Jurado 2', 'Jurado 3', 'Mayoría']
+    j_title = ['Juez 1', 'Juez 2', 'Juez 3', 'Mayoría']
     for i,j in enumerate(j_bars):
         ax = df[j].value_counts().plot(kind='bar', color=['skyblue','salmon'], title='Distribución de Clases de '+j_title[i],xlabel='Clase',ylabel='Nº de ejemplos')
         ax.margins(y=0.15)
