@@ -101,16 +101,17 @@ def stats_outliers(df):
     print("\\begin{tabular}{|c|c|c|c|c|} \\hline")
     print("Clase & Valores atípicos & Frecuencia & Mín-Máx Atípico & Mín-Máx Típico\\\\ \\hline")
 
-
+    totall = 0
     for c, grp in df.groupby("label"):
         s = _outliers(grp) # Obtenemos valores atípicos.
         outl = grp[s] # Valores atípicos
         inl = grp[s == False] # Valores típicos
         n = len(outl)
+        totall+=n
         tot = len(grp)
         print(f'{c} & {n} & {n/tot*100:.2f}\\% & [{outl['char_len'].min()}-{outl['char_len'].max()}] & [{inl['char_len'].min()}-{inl['char_len'].max()}]\\\\ \\hline')
 
-    print(f'Total & {tot} & \\\\ \\hline')
+    print(f'Total & {totall} & \\\\ \\hline')
     print("\\end{tabular}")
 
 

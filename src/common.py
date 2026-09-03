@@ -24,7 +24,6 @@ PARAM_DEFAULTS = {
         "VFILE" : "data/pkls/crisp/rb_db", 
         "FILE" : "rb_db", 
         "FILE_F" : "rbf_db", 
-        "FUZZY_BAL_CRISP" : False,
     },
     "DATAGEN" : {
         "TEST_PERCENT" : 15,
@@ -134,7 +133,7 @@ def _closest(v,l):
     return fi
 
 # Devuelve los pesos de clase de la lista dada. Si FUZZY_BAL_CRISP=True, se redondean las etiquetas para el cálculo.
-def get_class_weights(arr,FUZZY_BAL_CRISP=False):
+def get_class_weights(arr,FUZZY_BAL_CRISP=True):
 
     if FUZZY_BAL_CRISP: 
         farr = [int(x >= 0.5) for x in arr]
@@ -154,6 +153,7 @@ def get_class_weights(arr,FUZZY_BAL_CRISP=False):
 
     return class_weights
 
+# Aplica sobre df la técnica de balanceo especificada por balancing y si FUZZY_BAL_CRISP=True se emplean clases crisp aunque el dataset sea fuzzy
 # balancing puede ser None (Ninguna ténica de balanceo), RUS (RandomUnderSampler), ENN (EditedNearestNeighbours) o SMOTE.
 def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
     bal = None
@@ -165,9 +165,12 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
         case "SMOTE":
             bal = SMOTE(random_state=seed)
 
+    if balancing != "RUS" and FUZZY_BAL_CRISP:
+        raise Exception("FUZZY_BAL_CRISP solo puede ser verdadero con RUS")
+    
     if bal:
         is_float = df['label'].dtype != 'int64'
-        if FUZZY_BAL_CRISP and balancing != "SMOTE": # Con SMOTE no usamos datos CRISP para balancear.
+        if FUZZY_BAL_CRISP:
             y = (df['label']).round().astype(int)
         else:
             y = np.floor(df['label']*3).astype(int)
@@ -179,7 +182,6 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
         n_new = len(y_new)
         if balancing == "SMOTE": # En caso de SMOTE, adjuntamos casos sintéticos al dataset principal.
             if n_new > 0:
-                rng = np.random.default_rng(seed)
                 new_rows = {'txt':[],'label':[],'vec':[]}
                 for i in range(n_og,n_new):
                     y_i = y_new[i]
@@ -188,8 +190,7 @@ def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
                     else:
                         y_i = int(y_i)/3
                     vec_i = x_new[i]
-                    cdf = df[df['label'] == y_i].reset_index(drop=True)
-                    txt_rng = cdf['txt'][rng.integers(0,len(cdf))] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar BERT.
+                    txt_rng = "" # Se deja un texto de relleno por compatibilidad, la columna txt NO se debe utilizar cuando se emplea SMOTE
                     new_rows['txt'].append(txt_rng)
                     new_rows['label'].append(y_i)
                     new_rows['vec'].append(vec_i)
@@ -216,7 +217,7 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
 
     fit_t = []
 
-    for seed in seeds:
+    for step, seed in enumerate(seeds):
         if trial is not None:
             if trial.should_prune():
                 raise TrialPruned(f"Podada semilla {seed} por decisión del pruner.")
@@ -225,7 +226,7 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
             
 
         train_ds = pd.read_pickle(file+str(seed)+"train.pkl")
-        if is_test: # Utilizamos conjunto de evaluación o test dependiendo del parámetros is_test.
+        if is_test: # Utilizamos conjunto de validación o test dependiendo del parámetros is_test.
             test_ds = pd.read_pickle(file+str(seed)+"test.pkl")
         else:
             test_ds = pd.read_pickle(file+str(seed)+"eval.pkl")
@@ -254,8 +255,10 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
             joblib.dump(model, model_path+"/mseed"+str(seed)+".pkl")
             print(f"Guardado modelo de semilla: {seed}")
        
-       
-        results.append(compute_metrics(Y_tst,y_pred,y_probs))
+        r = compute_metrics(Y_tst,y_pred,y_probs)
+        if trial is not None:
+            trial.report(r['macro_f1'],step=step)
+        results.append(r)
 
 
     return results, fit_t
@@ -316,8 +319,8 @@ def printtest(seeds,results,times,metric_names):
         print(f"{m}: {np.mean(values):.4f} (+/- {np.std(values):.4f})")
     print(f"Tiempo de entrenamiento medio: {timedelta(milliseconds=int(np.mean(times)*1000))}s (+/- {np.std(times):.4f}s)")
 
-# Usa los mejores parámetros del estudio pasado y evalua el conjunto de datos de test o evaluación.
-# Dejar use_test en True si se quieren usar los conjuntos de datos de test, dejar en False si se quiere usar los de evaluación.
+# Usa los mejores parámetros del estudio pasado y evalua el conjunto de datos de test o validación.
+# Dejar use_test en True si se quieren usar los conjuntos de datos de test, dejar en False si se quiere usar los de validación.
 def test_study(study,model,file,seeds,use_test,save=False,model_path="",NO_TRAIN=False):
 
     param_grid = study.best_params # Copiamos parámetros desde estudio.

@@ -40,7 +40,7 @@ def compute_metrics(FUZZY, eval_pred):
     }
 
 # Permite entrenar el modelo con los parámetros dados y muestra una media de las métricas de evaluación.
-def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW=False,FUZZY_BAL_CRISP=False,model_name="microsoft/deberta-v3-small",NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
+def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW=False,FUZZY_BAL_CRISP=True,model_name="microsoft/deberta-v3-small",NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
     
     param_grid = study.best_params # Cargamos mejores hiperparámetros.
 
@@ -51,7 +51,7 @@ def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BAL
     
     printtest(SEEDS,results,times,metric_names)
 
-# Carga y aplica la función de tokenización a los datasets de entrenamiento, evaluación y test y los devuelve.
+# Carga y aplica la función de tokenización a los datasets de entrenamiento, validación y test y los devuelve.
 def obtain_tokenized(tokenize_function, u_file, seed):
     train_ds = pd.read_pickle(u_file+str(seed)+"train.pkl")
     eval_ds = pd.read_pickle(u_file+str(seed)+"eval.pkl")
@@ -109,7 +109,7 @@ def get_tokenizer(model_name):
     return tokenizer, tokenize_function
 
 # Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación.
-def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=False,MODEL_NAME = "microsoft/deberta-v3-small",trial=None,NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
+def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=True,MODEL_NAME = "microsoft/deberta-v3-small",trial=None,NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
 
     tokenizer, tokenize_function = get_tokenizer(tmodel_name)
 
@@ -201,7 +201,7 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             print(f"Modelo guardado en semilla {seed}.")
         
 
-        if USE_TEST: # Calcula métricas con datos de test o evaluación.
+        if USE_TEST: # Calcula métricas con datos de test o validación.
             eval_stats = trainer.evaluate(eval_dataset=t_test)
         else:
             eval_stats = trainer.evaluate(eval_dataset=t_eval)

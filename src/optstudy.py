@@ -11,7 +11,7 @@ if __name__ == "__main__":
     else:
         simplefilter("ignore", category=optuna.exceptions.ExperimentalWarning) # Quitamos advertencia de función experimental.
      
-        study = optuna.study.load_study(storage=sys.argv[1],study_name=sys.argv[2]) # Cargamos estudio existente.
+        study = optuna.study.load_study(storage="sqlite:///"+sys.argv[1],study_name=sys.argv[2]) # Cargamos estudio existente.
 
         ctrials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
 

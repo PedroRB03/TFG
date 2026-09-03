@@ -2,6 +2,13 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+
+
+# Lo de abajo estaba en balance
+#rng = np.random.default_rng(seed)
+#cdf = df[df['label'] == y_i].reset_index(drop=True)
+#txt_rng = cdf['txt'][rng.integers(0,len(cdf))] # añadimos un texto aleatorio de relleno, solo utilizado en caso de usar BERT.
+
 # Crea un pipeline de scikit-learn con el modelo pasado, usado por lgbm y svm
 def make_pipeline(model):
     tfidf_p = TfidfVectorizer( # Vectorizador

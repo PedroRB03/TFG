@@ -7,7 +7,7 @@ import joblib
 from pathlib import Path
 
 
-# Separa datos en tres subconjuntos: entrenamiento, evaluación y test.
+# Separa datos en tres subconjuntos: entrenamiento, validación y test.
 def _data_separate(df,test_size,eval_size,seed=1):
     if (test_size+eval_size) >= 100: # Comprobamos validez de los porcentajes.
         raise Exception("test_size y eval_size no pueden sumar 100 o valores superiores.")
@@ -64,7 +64,6 @@ if __name__ == "__main__":
     SEEDS = params["COMMON"]["SEEDS"]
     TEST_PERCENT = params["DATAGEN"]["TEST_PERCENT"]
     EVAL_PERCENT = params["DATAGEN"]["EVAL_PERCENT"]
-    FUZZY_BAL_CRISP = params["COMMON"]["FUZZY_BAL_CRISP"]
     FILE = params["DATAGEN"]["FILE"]
     VFILE = params["COMMON"]["VFILE"]
     OUT_FILE = params["COMMON"]["FILE"]
@@ -102,7 +101,6 @@ if __name__ == "__main__":
             vec_tst = tfidf.transform(df_tst["txt"])
             # Guardamos vectorizadores
             Path(VFILE).mkdir(parents=True, exist_ok=True)
-            joblib.dump(tfidf, VFILE+tfidfp+str(seed)+".pkl")
 
             # Creamos la columna vec con las entradas vectorizadas
             df_tr['vec'] = [vec_tr[i,:] for i in range(vec_tr.shape[0])]
@@ -111,8 +109,14 @@ if __name__ == "__main__":
 
 
             if BALANCING is not None and BALANCING != "None" and BALANCING != "": # Balanceamos si BALANCING no es None.
-                df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=FUZZY_BAL_CRISP)
-            # Guardamos conjuntos de entrenamiento, evaluación y test.
+                if BALANCING == "RUS" and i == 1: # Si es fuzzy y se emplea RUS
+                    df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=True) # Se consideran etiquetas crisp para el balanceo
+                else:
+                    df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=False)
+                
+
+            # Guardamos vectorizador y conjuntos de entrenamiento, validación y test.
+            joblib.dump(tfidf, VFILE+tfidfp+str(seed)+".pkl")
             df_tr.to_pickle(f_path+str(seed)+"train.pkl")
             df_ev.to_pickle(f_path+str(seed)+"eval.pkl")
             df_tst.to_pickle(f_path+str(seed)+"test.pkl")

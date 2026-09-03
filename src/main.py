@@ -32,6 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("input",help='Ruta al archivo csv o pkl con un mensaje por fila.')
     parser.add_argument("-m","--model",required=True,help="Modelo a utilizar.",choices=['lgbm','svm','bert','all'])
     parser.add_argument("-c","--config",default='params.ini',help="Especifica ruta al archivo de configuración.")
+    parser.add_argument("-l","--limit",default='',help="Limita el número de muestras a las n primeras.")
     parser.add_argument("-p","--proba",action='store_true',help="Muestra el grado de pertenencia a la clase ganadora.")
     parser.add_argument("-t","--time",action='store_true',help="Muestra tiempo tardado en clasificar por muestra y medio.")
 
@@ -82,6 +83,9 @@ if __name__ == "__main__":
     df=df[["txt"]]
 
     df["txt"] = df["txt"].apply(lambda x: light_normalize_text(str(x)))
+    
+    if args.limit != '':
+        df = df.head(int(args.limit))
     ##
 
     ## CARGA DE MODELOS
@@ -110,16 +114,18 @@ if __name__ == "__main__":
 
     ## OBTENCIÓN DE PREDICCIONES
 
-    # Obtenemos predicciones para modelos scikit.
+    # Obtenemos predicciones para modelos Scikit.
     def _get_r(model,vec):
         ret = None
         if model:
-            st = time.time_ns()
             msgv = vec.transform(df["txt"]) # Vectorizamos.
+
+            st = time.time_ns()
             p = model.predict_proba(msgv) # Obtenemos probabilidades.
+            t = time.time_ns()-st
+
             p_w = np.max(p,axis=1)
             r = np.argmax(p, axis=1)
-            t = time.time_ns()-st
             ret = (r,p_w,t)
 
         return ret
@@ -133,11 +139,11 @@ if __name__ == "__main__":
         trainer = Trainer(model=bert)
 
         bdf = Dataset.from_pandas(df[['txt']])
-        st = time.time_ns()
         msgv = bdf.map(bert_v, batched=True) # Tokenización por lotes.
+        st = time.time_ns()
         out = trainer.predict(msgv)
-        logits = out.predictions
         t = time.time_ns()-st
+        logits = out.predictions
 
         if logits.shape[1] > 1: # Para crisp.
             st = time.time_ns()
