@@ -111,7 +111,7 @@ if __name__ == "__main__":
             if BALANCING is not None and BALANCING != "None" and BALANCING != "": # Balanceamos si BALANCING no es None.
                 if BALANCING == "RUS" and i == 1: # Si es fuzzy y se emplea RUS
                     df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=True) # Se consideran etiquetas crisp para el balanceo
-                else:
+                elif BALANCING in ["RUS",None] or i == 0: # No aplicar SMOTE o ENN sobre fuzzy
                     df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=False)
                 
 

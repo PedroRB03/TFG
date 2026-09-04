@@ -34,7 +34,7 @@ if __name__ == "__main__":
     parser.add_argument("-c","--config",default='params.ini',help="Especifica ruta al archivo de configuración.")
     #parser.add_argument("-l","--limit",default='',help="Limita el número de muestras a las n primeras.")
     parser.add_argument("-p","--proba",action='store_true',help="Muestra el grado de pertenencia a la clase ganadora.")
-    parser.add_argument("-t","--time",action='store_true',help="Muestra tiempo tardado en clasificar por muestra y medio.")
+    parser.add_argument("-t","--time",action='store_true',help="Muestra tiempo tardado cada modelo en calcular las predicciones.")
 
     args = parser.parse_args()
     params = get_params(args.config)
@@ -70,11 +70,13 @@ if __name__ == "__main__":
     ## FORMACIÓN DEL DATAFRAME
     if ext == '.csv':
         df = pd.read_csv(f_path, header=None)
-        df.columns = ['txt']
 
     else:
         df = pd.read_pickle(f_path)
-        df=df.rename(columns={df.columns[0]:"txt"})
+
+
+    df = df[df.columns[0]].to_frame() # Se deja solo la primera columna
+    df.columns = ['txt']
 
     if len(df) == 0:
         print("El conjunto de datos está vacío.")
@@ -173,7 +175,7 @@ if __name__ == "__main__":
         if i == 0:
             return "Normal"
         else:
-            return "Rage-bait"
+            return "Trolling"
 
     def _showres(res,l,i):
         if res:
@@ -185,9 +187,9 @@ if __name__ == "__main__":
     
     def _showtime(res,l):
         if res:
-            print(f" {l}: ({res[2]/1e6:.2f}ms total, {res[2]/1e6/len(df):.2f}ms por muestra estimado)",end="")
+            print(f" {l}: ({res[2]/1e6:.2f}ms total)",end="")
 
-    print("="*30 + "RESULTADOS" + "="*30)
+    #print("="*30 + "RESULTADOS" + "="*30)
 
     for i,msg in enumerate(df["txt"]):
         print(f"{i}: [",end="")
@@ -201,5 +203,5 @@ if __name__ == "__main__":
         _showtime(lgbm_r,"lgbm")
         _showtime(svm_r,"svm")
         _showtime(bert_r,"deberta")
-        print(" ]")
+        print(" ]",end="")
     ##
