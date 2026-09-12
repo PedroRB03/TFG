@@ -25,7 +25,6 @@ if __name__ == "__main__":
 
     model = svm.SVC(
         #decision_function_shape="ovr",
-        probability=True,
         kernel=KERNEL,
         class_weight="balanced"
     )

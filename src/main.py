@@ -118,24 +118,30 @@ if __name__ == "__main__":
 
     ## OBTENCIÓN DE PREDICCIONES
 
-    # Obtenemos predicciones para modelos Scikit.
-    def _get_r(model,vec):
-        ret = None
-        if model:
-            msgv = vec.transform(df["txt"]) # Vectorizamos.
+    lgbm_r = None
+    # Predicciones de LGBM.
+    if lgbm:
+        msgv = lgbm_v.transform(df["txt"]) # Vectorizamos.
 
-            st = time.time_ns()
-            p = model.predict_proba(msgv) # Obtenemos probabilidades.
-            t = time.time_ns()-st
+        st = time.time_ns()
+        p = lgbm.predict_proba(msgv) # Obtenemos probabilidades.
+        t = time.time_ns()-st
 
-            p_w = np.max(p,axis=1)
-            r = np.argmax(p, axis=1)
-            ret = (r,p_w,t)
+        p_w = np.max(p,axis=1)
+        r = np.argmax(p, axis=1)
+        lgbm_r = (r,p_w,t)
 
-        return ret
+    # Predicciones de SVM.
+    svm_r = None
+    if svm:
+        msgv = svm_v.transform(df["txt"]) # Vectorizamos.
 
-    lgbm_r = _get_r(lgbm,lgbm_v)
-    svm_r = _get_r(svm,svm_v)
+        st = time.time_ns()
+        p = svm.decision_function(msgv) # Obtenemos distancias al hiperplano.
+        t = time.time_ns()-st
+
+        r = svm.classes_[(p > 0).astype(int)] # Obtenemos salidas exactas, clase 0 o 1.
+        svm_r = (r,p,t)
 
     # Predicciones de DeBERTaV3.
     bert_r = None

@@ -62,9 +62,10 @@ def obtain_tokenized(tokenize_function, FILE, seed,FUZZY):
         eval_ds.drop(columns=["label"], inplace=True)
         test_ds.drop(columns=["label"], inplace=True)
         # Se renombran las clases fuzzy.
-        train_ds.rename(columns={"labelf":"label"})
-        eval_ds.rename(columns={"labelf":"label"})
-        test_ds.rename(columns={"labelf":"label"})
+        train_ds=train_ds.rename(columns={"labelf":"label"})
+        eval_ds=eval_ds.rename(columns={"labelf":"label"})
+        test_ds=test_ds.rename(columns={"labelf":"label"})
+
     else:
         train_ds = pd.read_pickle(FILE+"/cs"+str(seed)+"train.pkl")
         eval_ds = pd.read_pickle(FILE+"/s"+str(seed)+"eval.pkl")
