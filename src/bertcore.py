@@ -52,10 +52,29 @@ def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BAL
     printtest(SEEDS,results,times,metric_names)
 
 # Carga y aplica la función de tokenización a los datasets de entrenamiento, validación y test y los devuelve.
-def obtain_tokenized(tokenize_function, u_file, seed):
-    train_ds = pd.read_pickle(u_file+str(seed)+"train.pkl")
-    eval_ds = pd.read_pickle(u_file+str(seed)+"eval.pkl")
-    test_ds = pd.read_pickle(u_file+str(seed)+"test.pkl")
+def obtain_tokenized(tokenize_function, FILE, seed,FUZZY):
+    if FUZZY:
+        train_ds = pd.read_pickle(FILE+"/fs"+str(seed)+"train.pkl")
+        eval_ds = pd.read_pickle(FILE+"/s"+str(seed)+"eval.pkl")
+        test_ds = pd.read_pickle(FILE+"/s"+str(seed)+"test.pkl")
+        # Se eliminan las clases crisp.
+        train_ds.drop(columns=["label"], inplace=True)
+        eval_ds.drop(columns=["label"], inplace=True)
+        test_ds.drop(columns=["label"], inplace=True)
+        # Se renombran las clases fuzzy.
+        train_ds.rename(columns={"labelf":"label"})
+        eval_ds.rename(columns={"labelf":"label"})
+        test_ds.rename(columns={"labelf":"label"})
+    else:
+        train_ds = pd.read_pickle(FILE+"/cs"+str(seed)+"train.pkl")
+        eval_ds = pd.read_pickle(FILE+"/s"+str(seed)+"eval.pkl")
+        test_ds = pd.read_pickle(FILE+"/s"+str(seed)+"test.pkl")
+        # Se elimina la etiqueta fuzzy.
+        train_ds.drop(columns=["labelf"], inplace=True)
+        eval_ds.drop(columns=["labelf"], inplace=True)
+        test_ds.drop(columns=["labelf"], inplace=True)
+
+    
 
     # Eliminamos columnas con texto pasado por TF-IDF.
     train_ds.drop(columns=["vec"], inplace=True)
@@ -109,7 +128,7 @@ def get_tokenizer(model_name):
     return tokenizer, tokenize_function
 
 # Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación.
-def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=True,MODEL_NAME = "microsoft/deberta-v3-small",trial=None,NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
+def trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=True,MODEL_NAME = "microsoft/deberta-v3-small",trial=None,NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
 
     tokenizer, tokenize_function = get_tokenizer(tmodel_name)
 
@@ -130,7 +149,7 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
 
         set_seed(seed) 
 
-        t_train, t_eval, t_test = obtain_tokenized(tokenize_function,u_file,seed) # Datasets tokenizados.
+        t_train, t_eval, t_test = obtain_tokenized(tokenize_function,FILE,seed,FUZZY) # Datasets tokenizados.
 
         dname = RESULTS+"/seed"+str(seed)
         Path(dname).mkdir(parents=True, exist_ok=True) # Creamos ruta si no existe.
@@ -158,6 +177,7 @@ def trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MOD
             learning_rate=param_grid['learning_rate'],
             num_train_epochs=param_grid['num_train_epochs'],
             warmup_steps=param_grid['warmup_steps'],
+            weight_decay=param_grid['weight_decay'],
             logging_steps=100,
             seed=seed,
             data_seed=seed,

@@ -14,7 +14,7 @@ if __name__ == "__main__":
     OPT_DB = params["SVM"]["OPT_DB"]
     MODEL_PATH = params["SVM"]["MODEL_PATH"]
     SEEDS = params["COMMON"]["SEEDS"]
-    FILE = params["COMMON"]["FILE"]+"/rb_db"
+    FILE = params["COMMON"]["FILE"]
     USE_TEST = params["SVM"]["USE_TEST"]
     SAVE_MODEL = params["SVM"]["SAVE_MODEL"]
     KERNEL = params["SVM"]["KERNEL"]

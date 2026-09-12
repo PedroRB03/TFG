@@ -32,10 +32,11 @@ if __name__ == "__main__":
     parser.add_argument("input",help='Ruta al archivo csv o pkl con un mensaje por fila.')
     parser.add_argument("-m","--model",required=True,help="Modelo a utilizar.",choices=['lgbm','svm','bert','all'])
     parser.add_argument("-c","--config",default='params.ini',help="Especifica ruta al archivo de configuración.")
-    #parser.add_argument("-l","--limit",default='',help="Limita el número de muestras a las n primeras.")
-    parser.add_argument("-p","--proba",action='store_true',help="Muestra el grado de pertenencia a la clase ganadora.")
+    parser.add_argument("-p","--proba",action='store_true',help="Muestra la salida bruta del modelo respecto a la clase ganadora.")
     parser.add_argument("-t","--time",action='store_true',help="Muestra tiempo tardado cada modelo en calcular las predicciones.")
 
+    parser.add_argument("-l","--limit",default='',help="Limita el número de muestras a las n primeras.")
+    
     args = parser.parse_args()
     params = get_params(args.config)
 
@@ -86,8 +87,8 @@ if __name__ == "__main__":
 
     df["txt"] = df["txt"].apply(lambda x: light_normalize_text(str(x)))
     
-    #if args.limit != '':
-    #    df = df.head(int(args.limit))
+    if args.limit != '':
+        df = df.head(int(args.limit))
 
     ##
 
@@ -163,10 +164,9 @@ if __name__ == "__main__":
             probs = logits.squeeze()
             r= np.round(probs).astype(int) # Redondeo para obtener 0 o 1.
             r = np.clip(r, 0, 1) # Aseguramos rango [0,1].
-            p = sigmoid(probs)
             t+= time.time_ns()-st
 
-            bert_r = (r,p,t) # Se utiliza la función sigmoide para colocar logits entre 0 y 1.
+            bert_r = (r,probs,t) 
     ##
 
 
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         if res:
             r = res[0][i]
             if args.proba: # Si se quiere mostrar probabilidades.
-                    print(f" {l}: ({_nominal(r)},{res[1][i]*100:.2f}%)",end="")
+                    print(f" {l}: ({_nominal(r)},{res[1][i]:.2f})",end="")
             else:
                     print(f" {l}: ({_nominal(r)})",end="")
     
@@ -198,8 +198,8 @@ if __name__ == "__main__":
         _showres(bert_r,"deberta",i)
         print(" ]")
     if args.time:
-        print(f"Tiempo de clasificación: ")
-        print(f"    [",end="")
+        print(f"Tiempo de inferencia: ")
+        print(f"[",end="")
         _showtime(lgbm_r,"lgbm")
         _showtime(svm_r,"svm")
         _showtime(bert_r,"deberta")

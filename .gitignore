@@ -2,8 +2,7 @@
 .venv
 .vscode
 .conda
-data/pkls/crisp/*
-data/pkls/fuzzy/*
+data/pkls/*
 src/__pycache__
 data/bert_results/*
 results/*

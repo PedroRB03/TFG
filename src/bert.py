@@ -13,27 +13,23 @@ if __name__ == "__main__":
     OPT_STUDY = params["BERT"]["OPT_STUDY"]
     OPT_DB = params["BERT"]["OPT_DB"]
     SEEDS = params["COMMON"]["SEEDS"]
-    FILE = params["COMMON"]["FILE"]+"/rb_db"
-    FILE_F = params["COMMON"]["FILE_F"]+"/rbf_db"
+    FILE = params["COMMON"]["FILE"]
     RESULTS = params["BERT"]["RESULTS"]
     FUZZY = params["BERT"]["FUZZY"]
     EARLY_STOP = params["BERT"]["EARLY_STOP"]
     USE_TEST = params["BERT"]["USE_TEST"]
     SAVE_MODEL = params["BERT"]["SAVE_MODEL"]
-    BALANCED_CW = params["BERT"]["BALANCED_CW"]
     SHOW_LOAD_REPORT = params["BERT"]["SHOW_LOAD_REPORT"]
-    MODEL_NAME = params["BERT"]["MODEL_NAME"]
     NO_TRAIN = params["BERT"]["NO_TRAIN"]
     LOCAL_MODEL_NAME = params["BERT"]["LOCAL_MODEL_NAME"]
     LOCAL_MODEL_DIR = params["BERT"]["LOCAL_MODEL_DIR"]
+    BALANCED_CW = params["BERT"]["BALANCED_CW"]
+    
+    MODEL_NAME = "microsoft/deberta-v3-small"
     ##
    
 
 
-    # Calculamos ruta de los datos a usar en función del parámetro FUZZY.
-    u_file = FILE 
-    if FUZZY:
-        u_file = FILE_F
 
     # Función para buscar hiperparámetros.
     def objective(trial: optuna.Trial):
@@ -42,10 +38,11 @@ if __name__ == "__main__":
             'learning_rate' : trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True),
             'num_train_epochs' : trial.suggest_int("num_train_epochs", 1 , 4),
             'warmup_steps' : trial.suggest_int("warmup_steps", 100 , 600),
+            'weight_decay' : trial.suggest_float("weight_decay",1e-5,0.1,log=True),
             'gradient_accumulation_steps' : trial.suggest_categorical("gradient_accumulation_steps",[1,2,4,8])
         }
         # Se obtienen las métricas por semilla.
-        results, _ = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST=False,SAVE_MODEL=False,BALANCED_CW=BALANCED_CW,FUZZY_BAL_CRISP=True,MODEL_NAME=MODEL_NAME,trial=trial,tmodel_name=MODEL_NAME)
+        results, _ = trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST=False,SAVE_MODEL=False,BALANCED_CW=BALANCED_CW,FUZZY_BAL_CRISP=True,MODEL_NAME=MODEL_NAME,trial=trial,tmodel_name=MODEL_NAME)
         
         values = [r["eval_macro_f1"] for r in results]
         
@@ -63,6 +60,6 @@ if __name__ == "__main__":
         optimize(study,objective,OPT_TIME)
     else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada).
         if NO_TRAIN:
-            testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,True,model_name=LOCAL_MODEL_DIR,NO_TRAIN=True,tmodel_name=MODEL_NAME)
+            testbert(study,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,True,model_name=LOCAL_MODEL_DIR,NO_TRAIN=True,tmodel_name=MODEL_NAME)
         else:
-            testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,True,model_name=MODEL_NAME,tmodel_name=MODEL_NAME)
+            testbert(study,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,True,model_name=MODEL_NAME,tmodel_name=MODEL_NAME)

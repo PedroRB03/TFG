@@ -13,6 +13,7 @@ from optuna.exceptions import TrialPruned
 import time
 from pathlib import Path
 import joblib
+from sklearn.svm import SVC
 
 from imblearn.under_sampling import EditedNearestNeighbours, RandomUnderSampler
 from imblearn.over_sampling import SMOTE
@@ -21,9 +22,8 @@ from imblearn.over_sampling import SMOTE
 PARAM_DEFAULTS = {
     "COMMON" : { 
         "SEEDS" : [600,601,602,603,604],   
-        "VFILE" : "data/pkls/crisp/rb_db", 
-        "FILE" : "rb_db", 
-        "FILE_F" : "rbf_db", 
+        "VFILE" : "results/tfidf", 
+        "FILE" : "data/pkls", 
     },
     "DATAGEN" : {
         "TEST_PERCENT" : 15,
@@ -35,45 +35,44 @@ PARAM_DEFAULTS = {
         "NGRAM_MAX" : 3,
     },
     "LGBM" : { 
-        "OPT_TIME" : 60, 
+        "OPT_TIME" : 0, 
         "NO_TRAIN" : False,
         "OPT_STUDY" : "lgbm-study", 
-        "OPT_DB" : "sqlite:///lgbm-study.db", 
-        "MODEL_PATH" : "", 
+        "OPT_DB" : "sqlite:///results/lgbm-study.db", 
+        "MODEL_PATH" : "results/lgbm", 
         "USE_TEST" : False, 
         "SAVE_MODEL" : False, 
-        "LOCAL_MODEL_DIR" : "", 
-        "VFILE" : "", 
-        "FILE" : "", 
+        "LOCAL_MODEL_DIR" : "best/lgbm", 
+        "VFILE" : "best/tfidf/tfidf600.pkl", 
+        "FILE" : "best/lgbm/mseed600.pkl", 
     },
     "SVM" : {
-        "OPT_TIME" : 60, 
+        "OPT_TIME" : 0, 
         "KERNEL" : "linear", 
         "NO_TRAIN" : False,
         "OPT_STUDY" : "svm-study", 
-        "OPT_DB" : "sqlite:///svm-study.db",
-        "MODEL_PATH" : "", 
+        "OPT_DB" : "sqlite:///results/svm-study.db",
+        "MODEL_PATH" : "results/svm", 
         "USE_TEST" : False,
         "SAVE_MODEL" : False,
-        "LOCAL_MODEL_DIR" : "", 
-        "VFILE" : "", 
-        "FILE" : "", 
+        "LOCAL_MODEL_DIR" : "best/svm", 
+        "VFILE" : "best/tfidf/tfidf600.pkl", 
+        "FILE" : "best/svm/mseed600.pkl", 
     },
     "BERT" : { 
-        "OPT_TIME" : 60, 
-        "RESULTS" : "",
-        "FUZZY" : False, 
+        "OPT_TIME" : 0, 
+        "RESULTS" : "results/bert",
+        "FUZZY" : True, 
         "EARLY_STOP" : 3,
-        "BALANCED_CW" : False, 
+        "BALANCED_CW" : False,
         "SHOW_LOAD_REPORT" : True, 
-        "MODEL_NAME" : "microsoft/deberta-v3-small",
         "NO_TRAIN" : False,
         "OPT_STUDY" : "bert-study", 
-        "OPT_DB" : "sqlite:///bert-study.db", 
+        "OPT_DB" : "sqlite:///results/bert-study.db", 
         "USE_TEST" : False, 
         "SAVE_MODEL" : False, 
-        "LOCAL_MODEL_DIR" : "", 
-        "LOCAL_MODEL_NAME" : "", 
+        "LOCAL_MODEL_DIR" : "best/bert", 
+        "LOCAL_MODEL_NAME" : "best/bert/bert_model600", 
     },
 }
 
@@ -225,11 +224,13 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
                 raise TrialPruned(f"Podada semilla {seed} por media optimista inferior al mejor estudio.")
             
 
-        train_ds = pd.read_pickle(file+str(seed)+"train.pkl")
+        train_ds = pd.read_pickle(file+"/cs"+str(seed)+"train.pkl")
         if is_test: # Utilizamos conjunto de validación o test dependiendo del parámetros is_test.
-            test_ds = pd.read_pickle(file+str(seed)+"test.pkl")
+            test_ds = pd.read_pickle(file+"/s"+str(seed)+"test.pkl")
         else:
-            test_ds = pd.read_pickle(file+str(seed)+"eval.pkl")
+            test_ds = pd.read_pickle(file+"/s"+str(seed)+"eval.pkl")
+
+        
         
         X_trn = vstack(train_ds["vec"]) # Formamos matriz dispersa.
         Y_trn = train_ds["label"].astype("category")
@@ -248,7 +249,10 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
             fit_t.append(time.time()-st)
 
         y_pred = model.predict(X_tst)
-        y_probs = model.predict_proba(X_tst)[:,1]
+        if type(model) == SVC:
+            y_probs = model.decision_function(X_tst) # distancia al hiperplano para SVC en lugar de probabilidades
+        else:
+            y_probs = model.predict_proba(X_tst)[:,1]
 
         if save and not NO_TRAIN:
             Path(model_path).mkdir(parents=True, exist_ok=True)

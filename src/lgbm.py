@@ -14,7 +14,7 @@ if __name__ == "__main__":
     OPT_DB = params["LGBM"]["OPT_DB"]
     MODEL_PATH = params["LGBM"]["MODEL_PATH"]
     SEEDS = params["COMMON"]["SEEDS"]
-    FILE = params["COMMON"]["FILE"]+"/rb_db"
+    FILE = params["COMMON"]["FILE"]
     USE_TEST = params["LGBM"]["USE_TEST"]
     SAVE_MODEL = params["LGBM"]["SAVE_MODEL"]
     NO_TRAIN = params["LGBM"]["NO_TRAIN"]

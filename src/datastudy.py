@@ -206,7 +206,6 @@ if __name__ == "__main__":
     params = get_params(sys.argv[1] if len(sys.argv) > 1 else "params.ini")
     FILE = params["DATAGEN"]["FILE"]
     STUDY_OUT = params["DATAGEN"]["STUDY_OUT"]
-    MODEL_NAME = params["BERT"]["MODEL_NAME"]
     ##
 
     Path(STUDY_OUT).mkdir(parents=True, exist_ok=True) # Creamos ruta donde guardar tablas y gráficos si no existe.
