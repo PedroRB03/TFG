@@ -53,10 +53,10 @@ def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BAL
 
 # Carga y aplica la función de tokenización a los datasets de entrenamiento, validación y test y los devuelve.
 def obtain_tokenized(tokenize_function, FILE, seed,FUZZY):
+    train_ds = pd.read_pickle(FILE+"/s"+str(seed)+"train.pkl")
+    eval_ds = pd.read_pickle(FILE+"/s"+str(seed)+"eval.pkl")
+    test_ds = pd.read_pickle(FILE+"/s"+str(seed)+"test.pkl")
     if FUZZY:
-        train_ds = pd.read_pickle(FILE+"/fs"+str(seed)+"train.pkl")
-        eval_ds = pd.read_pickle(FILE+"/s"+str(seed)+"eval.pkl")
-        test_ds = pd.read_pickle(FILE+"/s"+str(seed)+"test.pkl")
         # Se eliminan las clases crisp.
         train_ds.drop(columns=["label"], inplace=True)
         eval_ds.drop(columns=["label"], inplace=True)
@@ -67,9 +67,6 @@ def obtain_tokenized(tokenize_function, FILE, seed,FUZZY):
         test_ds=test_ds.rename(columns={"labelf":"label"})
 
     else:
-        train_ds = pd.read_pickle(FILE+"/cs"+str(seed)+"train.pkl")
-        eval_ds = pd.read_pickle(FILE+"/s"+str(seed)+"eval.pkl")
-        test_ds = pd.read_pickle(FILE+"/s"+str(seed)+"test.pkl")
         # Se elimina la etiqueta fuzzy.
         train_ds.drop(columns=["labelf"], inplace=True)
         eval_ds.drop(columns=["labelf"], inplace=True)

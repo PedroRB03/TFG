@@ -1,5 +1,0 @@
-0: [ lgbm: (Normal,0.61) svm: (Normal,0.99) deberta: (Normal,-0.09) ]
-1: [ lgbm: (Trolling,0.68) svm: (Trolling,0.55) deberta: (Trolling,0.95) ]
-2: [ lgbm: (Trolling,0.98) svm: (Trolling,0.99) deberta: (Trolling,1.10) ]
-Tiempo de inferencia: 
-[ lgbm: (219.68ms total) svm: (1.90ms total) deberta: (236.24ms total) ]

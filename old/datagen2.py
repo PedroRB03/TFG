@@ -1,50 +1,10 @@
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from common import get_params,normalize_text,make_vectorizer
+from common import get_params,normalize_text,make_vectorizer, balance
 import sys
 import joblib
 from pathlib import Path
-from scipy.sparse import vstack
-from imblearn.under_sampling import EditedNearestNeighbours, RandomUnderSampler
-from imblearn.over_sampling import SMOTE
-
-# Aplica sobre df la técnica de balanceo especificada por balancing y si FUZZY_BAL_CRISP=True se emplean clases crisp aunque el dataset sea fuzzy
-# balancing puede ser None (Ninguna ténica de balanceo), RUS (RandomUnderSampler), ENN (EditedNearestNeighbours) o SMOTE.
-def _balance(df,balancing,seed):
-    bal = None
-    match balancing: # Creamos clase correspondiente.
-        case "RUS":
-            bal = RandomUnderSampler(random_state=seed)
-        case "ENN":
-            bal = EditedNearestNeighbours()
-        case "SMOTE":
-            bal = SMOTE(random_state=seed)
-
-    if bal:
-        y = df['label'].astype(int)
-
-        x = vstack(df["vec"])
-        x_new, y_new = bal.fit_resample(x,y)
-
-        n_og = len(df)
-        n_new = len(y_new)
-        if balancing == "SMOTE": # En caso de SMOTE, adjuntamos casos sintéticos al dataset principal.
-            if n_new > 0:
-                new_rows = {'txt':[],'label':[],'vec':[],'labelf':[]}
-                for i in range(n_og,n_new):
-                    y_i = y_new[i]
-                    vec_i = x_new[i]
-                    new_rows['txt'].append("") # Se deja un texto de relleno por compatibilidad, la columna txt NO se debe utilizar cuando se emplea SMOTE
-                    new_rows['label'].append(y_i)
-                    new_rows['labelf'].append(y_i) # Se deja columna fuzzy por compatibilidad, NO se debe usar en la práctica
-                    new_rows['vec'].append(vec_i)
-
-                df = pd.concat([df,pd.DataFrame(new_rows)], ignore_index=True)
-        else:
-            df = df.iloc[bal.sample_indices_]
-    
-    return df.sample(frac=1,random_state=seed).reset_index(drop=True) # Barajamos una última vez.
 
 
 # Separa datos en tres subconjuntos: entrenamiento, validación y test.
@@ -134,16 +94,23 @@ if __name__ == "__main__":
         df_ev['vec'] = [vec_ev[i,:] for i in range(vec_ev.shape[0])]
         df_tst['vec'] = [vec_tst[i,:] for i in range(vec_tst.shape[0])]
 
+        # Separamos entrenamiento crisp y fuzzy
+        dff_tr = df_tr.copy()
+        
         if BALANCING is not None: # Balanceamos si BALANCING no es None.
-            df_tr = _balance(df_tr,BALANCING,seed)
+            df_tr = balance(df_tr,BALANCING,seed,FUZZY_BAL_CRISP=False)
+            if BALANCING == "RUS": # Solo RUS está disponible para fuzzy
+                dff_tr = balance(dff_tr,BALANCING,seed,FUZZY_BAL_CRISP=True) # Se consideran etiquetas crisp para el balanceo
             
+
         # Creamos rutas si no existen
         Path(VFILE).mkdir(parents=True, exist_ok=True)
         Path(OUT_FILE).mkdir(parents=True, exist_ok=True)
 
         # Guardamos vectorizador y conjuntos de entrenamiento, validación y test.
         joblib.dump(tfidf, VFILE+"/tfidf"+str(seed)+".pkl")
-        df_tr.to_pickle(OUT_FILE+"/s"+str(seed)+"train.pkl")
+        df_tr.to_pickle(OUT_FILE+"/cs"+str(seed)+"train.pkl")
+        dff_tr.to_pickle(OUT_FILE+"/fs"+str(seed)+"train.pkl")
         df_ev.to_pickle(OUT_FILE+"/s"+str(seed)+"eval.pkl")
         df_tst.to_pickle(OUT_FILE+"/s"+str(seed)+"test.pkl")
         

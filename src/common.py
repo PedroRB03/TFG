@@ -28,7 +28,7 @@ PARAM_DEFAULTS = {
     "DATAGEN" : {
         "TEST_PERCENT" : 15,
         "EVAL_PERCENT" : 15,
-        "FILE" : 'trolling.xlsx',
+        "FILE" : 'data/trolling.xlsx',
         "STUDY_OUT" : "results/analytics",
         "BALANCING" : "None", 
         "NGRAM_MIN" : 1, 
@@ -152,54 +152,6 @@ def get_class_weights(arr,FUZZY_BAL_CRISP=True):
 
     return class_weights
 
-# Aplica sobre df la técnica de balanceo especificada por balancing y si FUZZY_BAL_CRISP=True se emplean clases crisp aunque el dataset sea fuzzy
-# balancing puede ser None (Ninguna ténica de balanceo), RUS (RandomUnderSampler), ENN (EditedNearestNeighbours) o SMOTE.
-def balance(df,balancing,seed,FUZZY_BAL_CRISP=False):
-    bal = None
-    match balancing: # Creamos clase correspondiente.
-        case "RUS":
-            bal = RandomUnderSampler(random_state=seed)
-        case "ENN":
-            bal = EditedNearestNeighbours()
-        case "SMOTE":
-            bal = SMOTE(random_state=seed)
-
-    if balancing != "RUS" and FUZZY_BAL_CRISP:
-        raise Exception("FUZZY_BAL_CRISP solo puede ser verdadero con RUS")
-    
-    if bal:
-        is_float = df['label'].dtype != 'int64'
-        if FUZZY_BAL_CRISP:
-            y = (df['label']).round().astype(int)
-        else:
-            y = np.floor(df['label']*3).astype(int)
-
-        x = vstack(df["vec"])
-        x_new, y_new = bal.fit_resample(x,y)
-
-        n_og = len(df)
-        n_new = len(y_new)
-        if balancing == "SMOTE": # En caso de SMOTE, adjuntamos casos sintéticos al dataset principal.
-            if n_new > 0:
-                new_rows = {'txt':[],'label':[],'vec':[]}
-                for i in range(n_og,n_new):
-                    y_i = y_new[i]
-                    if is_float:
-                        y_i = float(y_i)/3
-                    else:
-                        y_i = int(y_i)/3
-                    vec_i = x_new[i]
-                    txt_rng = "" # Se deja un texto de relleno por compatibilidad, la columna txt NO se debe utilizar cuando se emplea SMOTE
-                    new_rows['txt'].append(txt_rng)
-                    new_rows['label'].append(y_i)
-                    new_rows['vec'].append(vec_i)
-
-                df = pd.concat([df,pd.DataFrame(new_rows)], ignore_index=True)
-        else:
-            df = df.iloc[bal.sample_indices_]
-    
-    return df.sample(frac=1,random_state=seed).reset_index(drop=True) # Barajamos una última vez.
-
 # Calcular métricas a partir de resultados de un modelo SVM o LGBM.
 def compute_metrics(y_test,y_pred,y_probs):
     return {
@@ -224,7 +176,7 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
                 raise TrialPruned(f"Podada semilla {seed} por media optimista inferior al mejor estudio.")
             
 
-        train_ds = pd.read_pickle(file+"/cs"+str(seed)+"train.pkl")
+        train_ds = pd.read_pickle(file+"/s"+str(seed)+"train.pkl")
         if is_test: # Utilizamos conjunto de validación o test dependiendo del parámetros is_test.
             test_ds = pd.read_pickle(file+"/s"+str(seed)+"test.pkl")
         else:

@@ -23,34 +23,45 @@ if __name__ == "__main__":
     print("Validando conjuntos por semilla.")
     for seed in SEEDS:
         print(f"SEED {seed}:")
-        ftrn = pd.read_pickle(FILE+"/fs"+str(seed)+"train.pkl")
-        ctrn = pd.read_pickle(FILE+"/cs"+str(seed)+"train.pkl")
+        trn = pd.read_pickle(FILE+"/s"+str(seed)+"train.pkl")
         ev = pd.read_pickle(FILE+"/s"+str(seed)+"eval.pkl")
         tst = pd.read_pickle(FILE+"/s"+str(seed)+"test.pkl")
 
-        s_ftrn = set(ftrn['txt'].astype(str))
-        s_ctrn = set(ctrn['txt'].astype(str))
+        s_trn = set(trn['txt'].astype(str))
         s_ev = set(ev['txt'].astype(str))
         s_tst = set(tst['txt'].astype(str))
 
-        ftrn_dupe = ftrn.duplicated(subset=["txt"],keep=False)
-        ctrn_dupe = ctrn.duplicated(subset=["txt"],keep=False)
+        trn_dupe = trn.duplicated(subset=["txt"],keep=False)
         ev_dupe = ev.duplicated(subset=["txt"],keep=False)
         tst_dupe = tst.duplicated(subset=["txt"],keep=False)
 
         problems = 0
 
         print("Buscando problemas...")
-        if not _check_common(s_tst,s_ftrn): 
+
+        if len(trn_dupe) != len(s_trn):
+            problems +=1
+            print("- Hay elementos duplicados en Entrenamiento Fuzzy.")
+        if len(trn_dupe) != len(s_trn):
+            problems +=1
+            print("- Hay elementos duplicados en Entrenamiento Crisp.")
+        if len(ev_dupe) != len(s_ev):
+            problems +=1
+            print("- Hay elementos duplicados en Validación.")
+        if len(tst_dupe) != len(s_tst):
+            problems +=1
+            print("- Hay elementos duplicados en Test.")
+        
+        if not _check_common(s_tst,s_trn): 
             problems +=1
             print("- Test y Entrenamiento Fuzzy comparten muestras.")
-        if not _check_common(s_tst,s_ctrn): 
+        if not _check_common(s_tst,s_trn): 
             problems +=1
             print("- Test y Entrenamiento Crisp comparten muestras.")
-        if not _check_common(s_ev,s_ftrn): 
+        if not _check_common(s_ev,s_trn): 
             problems +=1
             print("- Validación y Entrenamiento Fuzzy comparten muestras.")
-        if not _check_common(s_ev,s_ctrn): 
+        if not _check_common(s_ev,s_trn): 
             problems +=1
             print("- Validación y Entrenamiento Crisp comparten muestras.")
 
@@ -63,8 +74,7 @@ if __name__ == "__main__":
         else:
             print(f"Se han encontrado {problems} problemas.")
 
-        print(f"Entrenamiento Crisp contiene {len(ctrn)} filas ({len(ctrn[ctrn["label"] == 0])} Normal y {len(ctrn[ctrn["label"] == 1])} Trolling).")
-        print(f"Entrenamiento Fuzzy contiene {len(ftrn)} filas ({len(ftrn[ftrn["label"] == 0])} Normal y {len(ftrn[ftrn["label"] == 1])} Trolling).")
+        print(f"Entrenamiento contiene {len(trn)} filas ({len(trn[trn["label"] == 0])} Normal y {len(trn[trn["label"] == 1])} Trolling).")
         print(f"Validación contiene {len(ev)} filas ({len(ev[ev["label"] == 0])} Normal y {len(ev[ev["label"] == 1])} Trolling).")
         print(f"Test contiene {len(tst)} filas ({len(tst[tst["label"] == 0])} Normal y {len(tst[tst["label"] == 1])} Trolling).")
         
