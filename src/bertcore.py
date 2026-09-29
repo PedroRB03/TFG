@@ -3,21 +3,58 @@ import pandas as pd
 from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer, EarlyStoppingCallback
 import numpy as np
-from sklearn.metrics import f1_score, balanced_accuracy_score, matthews_corrcoef, roc_auc_score,accuracy_score
+from sklearn.metrics import f1_score, balanced_accuracy_score, matthews_corrcoef, roc_auc_score,accuracy_score, confusion_matrix
 from scipy.special import softmax
 import torch
 import shutil
 import os
+from math import inf
+from sklearn.utils.class_weight import compute_class_weight
 from pathlib import Path
 import torch.nn.functional as F
 from transformers import set_seed
 from optuna import TrialPruned
-from common import should_prune, get_class_weights, printtest
+from common import should_prune, printtest, conf_mat
 import time
+
+# Esta función devuelve el índice del elemento más cercano al valor dado de una lista.
+def _closest(v,l):
+    i = 0
+    fi = len(l)
+    d = inf
+    for e in l:
+        di = abs(v-e)
+        if di < d:
+            fi = i
+            d = di
+        i+=1
+    return fi
+
+# Devuelve los pesos de clase de la lista dada. Si FUZZY_BAL_CRISP=True, se redondean las etiquetas para el cálculo.
+def get_class_weights(arr,FUZZY_BAL_CRISP=True):
+
+    if FUZZY_BAL_CRISP: 
+        farr = [int(x >= 0.5) for x in arr]
+    else:
+        farr = arr
+
+    classes = np.unique(farr)
+
+    class_weights = compute_class_weight(
+        class_weight="balanced",
+        classes=classes,
+        y=farr
+    )
+
+    if FUZZY_BAL_CRISP:
+        return [class_weights[_closest(x,classes)] for x in np.unique(arr)]
+
+    return class_weights
 
 # Función para calcular métricas.
 def compute_metrics(FUZZY, eval_pred):
     logits, labels = eval_pred
+
 
     if FUZZY:
         probs = logits.squeeze()
@@ -37,19 +74,21 @@ def compute_metrics(FUZZY, eval_pred):
         'matthews_corrcoef': matthews_corrcoef(labels, predictions),
         'roc_auc_ovr': roc_auc,
         'accuracy': accuracy_score(labels, predictions),
+        'confmat': confusion_matrix(labels, predictions)
     }
 
 # Permite entrenar el modelo con los parámetros dados y muestra una media de las métricas de evaluación.
-def testbert(study,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW=False,FUZZY_BAL_CRISP=True,model_name="microsoft/deberta-v3-small",NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
+# También muestra matriz de confusión media y desviación típica.
+def testbert(study,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,NO_TRAIN,MODEL_NAME="microsoft/deberta-v3-small",tmodel_name="microsoft/deberta-v3-small"):
     
     param_grid = study.best_params # Cargamos mejores hiperparámetros.
 
-    results, times = trainbert(param_grid,u_file,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,model_name,NO_TRAIN=NO_TRAIN,tmodel_name=tmodel_name)
-
+    results, times = trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,NO_TRAIN,MODEL_NAME,tmodel_name)
     metric_names = ['eval_macro_f1', 'eval_balanced_accuracy', 'eval_matthews_corrcoef', 'eval_roc_auc_ovr','eval_accuracy']
 
     
     printtest(SEEDS,results,times,metric_names)
+    conf_mat(results,'eval_confmat')
 
 # Carga y aplica la función de tokenización a los datasets de entrenamiento, validación y test y los devuelve.
 def obtain_tokenized(tokenize_function, FILE, seed,FUZZY):
@@ -74,7 +113,7 @@ def obtain_tokenized(tokenize_function, FILE, seed,FUZZY):
 
     
 
-    # Eliminamos columnas con texto pasado por TF-IDF.
+    # Eliminamos columnas de vectores TF-IDF.
     train_ds.drop(columns=["vec"], inplace=True)
     eval_ds.drop(columns=["vec"], inplace=True)
     test_ds.drop(columns=["vec"], inplace=True)
@@ -98,7 +137,7 @@ def weighted_compute_loss(class_weights, outputs, labels, num_items_in_batch=Non
 
         label_idx = torch.bucketize( # Calculamos a qué peso de clase le corresponde cada ejemplar.
             labels,
-            boundaries=torch.tensor([0.165, 0.495, 0.83], device=labels.device) # [(0+0.33)/2,(0.33+0.66)/2,(0.66+1)/2].
+            boundaries=torch.tensor([1/6, 1/2, 5/6], device=labels.device) # [(0+1/3)/2,(1/3+2/3)/2,(2/3+1)/2].
             # Usamos intervalos para asignar pesos de clase ya que tenemos valores continuos.
         )
         sample_weights = class_weights.to(labels.device)[label_idx]
@@ -126,13 +165,14 @@ def get_tokenizer(model_name):
     return tokenizer, tokenize_function
 
 # Entrena el modelo con las semillas y parámetros dados y devuelve las métricas de evaluación.
-def trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL=False,BALANCED_CW=False,FUZZY_BAL_CRISP=True,MODEL_NAME = "microsoft/deberta-v3-small",trial=None,NO_TRAIN=False,tmodel_name="microsoft/deberta-v3-small"):
+def trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,FUZZY_BAL_CRISP,NO_TRAIN,MODEL_NAME,tmodel_name,trial=None):
 
     tokenizer, tokenize_function = get_tokenizer(tmodel_name)
 
     results = [] # Resultados de cada semilla.
 
     fit_t = []
+
     model_name = MODEL_NAME
 
     for step,seed in enumerate(SEEDS):
@@ -181,7 +221,7 @@ def trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL
             data_seed=seed,
             metric_for_best_model='macro_f1',
             load_best_model_at_end=True,
-            #full_determinism=True, # viene bien para determinadas pruebas pero hace que el entrenamiento sea MUY lento
+            #full_determinism=True,
         )
         
         callbacks = []
@@ -218,6 +258,7 @@ def trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL
             print(f"Modelo guardado en semilla {seed}.")
         
 
+        
         if USE_TEST: # Calcula métricas con datos de test o validación.
             eval_stats = trainer.evaluate(eval_dataset=t_test)
         else:

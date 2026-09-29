@@ -1,6 +1,7 @@
 import sys
 import pandas as pd
 from common import get_params
+import numpy as np
 
 # Comprueba si dos conjuntos comparten elementos.
 # Si no comparten elementos, la suma de sus cardinales es el cardinal de su unión. 
@@ -24,6 +25,7 @@ if __name__ == "__main__":
     for seed in SEEDS:
         print(f"SEED {seed}:")
         trn = pd.read_pickle(FILE+"/s"+str(seed)+"train.pkl")
+        #trn.to_csv("test.csv")
         ev = pd.read_pickle(FILE+"/s"+str(seed)+"eval.pkl")
         tst = pd.read_pickle(FILE+"/s"+str(seed)+"test.pkl")
 
@@ -39,12 +41,13 @@ if __name__ == "__main__":
 
         print("Buscando problemas...")
 
-        if len(trn_dupe) != len(s_trn):
-            problems +=1
-            print("- Hay elementos duplicados en Entrenamiento Fuzzy.")
-        if len(trn_dupe) != len(s_trn):
-            problems +=1
-            print("- Hay elementos duplicados en Entrenamiento Crisp.")
+        if not (np.array(trn['label'])==np.round(trn['labelf'])).all():
+            problems += 1
+            print("- Hay clases fuzzy que no se corresponden con crisp.")
+
+        #if len(trn_dupe) != len(s_trn):
+        #    problems +=1
+        #    print("- Hay elementos duplicados en Entrenamiento. Puede ocurrir con SMOTE.")
         if len(ev_dupe) != len(s_ev):
             problems +=1
             print("- Hay elementos duplicados en Validación.")
@@ -54,16 +57,10 @@ if __name__ == "__main__":
         
         if not _check_common(s_tst,s_trn): 
             problems +=1
-            print("- Test y Entrenamiento Fuzzy comparten muestras.")
-        if not _check_common(s_tst,s_trn): 
-            problems +=1
-            print("- Test y Entrenamiento Crisp comparten muestras.")
+            print("- Test y Entrenamiento comparten muestras.")
         if not _check_common(s_ev,s_trn): 
             problems +=1
-            print("- Validación y Entrenamiento Fuzzy comparten muestras.")
-        if not _check_common(s_ev,s_trn): 
-            problems +=1
-            print("- Validación y Entrenamiento Crisp comparten muestras.")
+            print("- Validación y Entrenamiento comparten muestras.")
 
         if not _check_common(s_ev,s_tst):
             problems +=1

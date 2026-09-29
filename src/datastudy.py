@@ -29,7 +29,7 @@ def stats_nclass(df):
     t = len(df['label'])
     print("="*10 + "Frecuencias por clase" + "="*10)
 
-    print("\\begin{tabular}{|c|c|c|} \\hline")
+    print("\\begin{tabular}{ccc} \\hline")
     print("Clase & Ejemplares & Frecuencia \\\\ \\hline")
     for c, grp in df.groupby("label"):
         n = len(grp)
@@ -98,7 +98,7 @@ def stats_outliers(df):
     
     print("="*10 + "Valores atípicos de la longitud del texto por clase" + "="*10)
 
-    print("\\begin{tabular}{|c|c|c|c|c|} \\hline")
+    print("\\begin{tabular}{ccccc} \\hline")
     print("Clase & Valores atípicos & Frecuencia & Mín-Máx Atípico & Mín-Máx Típico\\\\ \\hline")
 
     totall = 0
@@ -171,7 +171,7 @@ def stats_freqword(df,N,per_row):
     for c, grp in df.groupby("label"):
         print("\\begin{table}[H]")
         print("\\centering")
-        print("\\begin{tabular}{|c|c|c|} \\hline")
+        print("\\begin{tabular}{ccc} \\hline")
         if per_row:
             txt = " ".join(grp["txt_unique"].dropna().astype(str)).lower()
         else:
@@ -187,7 +187,7 @@ def stats_freqword(df,N,per_row):
 
         fdist = nltk.FreqDist(wrds)
         top = fdist.most_common(N)
-        print("\\multicolumn{3}{|c|}{\\textit{"+c+"}} \\\\ \\hline")
+        print("\\multicolumn{3}{c}{\\textit{"+c+"}} \\\\ \\hline")
         print("Palabra & Apariciones & Frecuencia \\\\ \\hline")
         for w, n in top:
             print(f'{w} & {n} & {n/len(wrds)*100:.2f}\\% \\\\ \\hline')

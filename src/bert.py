@@ -42,7 +42,7 @@ if __name__ == "__main__":
             'gradient_accumulation_steps' : trial.suggest_categorical("gradient_accumulation_steps",[1,2,4,8])
         }
         # Se obtienen las métricas por semilla.
-        results, _ = trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST=False,SAVE_MODEL=False,BALANCED_CW=BALANCED_CW,FUZZY_BAL_CRISP=True,MODEL_NAME=MODEL_NAME,trial=trial,tmodel_name=MODEL_NAME)
+        results, _ = trainbert(param_grid,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,False,BALANCED_CW,True,False,MODEL_NAME,MODEL_NAME,trial)
         
         values = [r["eval_macro_f1"] for r in results]
         
@@ -59,7 +59,8 @@ if __name__ == "__main__":
     if OPT_TIME > 0 and not NO_TRAIN: # Si se busca optimizar, parte del estudio creado y busca por OPT_TIME segundos.
         optimize(study,objective,OPT_TIME)
     else: # Si no, obtiene los mejores parámetros hasta el momento (la base de datos debe contener unos mejores valores, no debe ser recién creada).
+        
         if NO_TRAIN:
-            testbert(study,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,True,model_name=LOCAL_MODEL_DIR,NO_TRAIN=True,tmodel_name=MODEL_NAME)
+            testbert(study,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,True,NO_TRAIN,LOCAL_MODEL_DIR,MODEL_NAME)
         else:
-            testbert(study,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,True,model_name=MODEL_NAME,tmodel_name=MODEL_NAME)
+            testbert(study,FILE,SEEDS,FUZZY,EARLY_STOP,RESULTS,USE_TEST,SAVE_MODEL,BALANCED_CW,True,NO_TRAIN,MODEL_NAME,MODEL_NAME)

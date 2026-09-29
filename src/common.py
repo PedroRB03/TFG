@@ -1,22 +1,17 @@
 import pandas as pd
-from sklearn.metrics import roc_auc_score, f1_score,balanced_accuracy_score, matthews_corrcoef, accuracy_score
+from sklearn.metrics import roc_auc_score, f1_score,balanced_accuracy_score, matthews_corrcoef, accuracy_score, ConfusionMatrixDisplay, confusion_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
 import re
-from datetime import timedelta
 import configparser
 from copy import deepcopy
 from scipy.sparse import vstack
-from math import inf
-from sklearn.utils.class_weight import compute_class_weight
 from optuna.exceptions import TrialPruned
 import time
 from pathlib import Path
 import joblib
 from sklearn.svm import SVC
-
-from imblearn.under_sampling import EditedNearestNeighbours, RandomUnderSampler
-from imblearn.over_sampling import SMOTE
+import matplotlib.pyplot as plt
 
 # Parámetros por defecto.
 PARAM_DEFAULTS = {
@@ -43,6 +38,7 @@ PARAM_DEFAULTS = {
         "USE_TEST" : False, 
         "SAVE_MODEL" : False, 
         "LOCAL_MODEL_DIR" : "best/lgbm", 
+        "LOCAL_VEC_DIR" : "best/lgbm/tfidf", 
         "VFILE" : "best/tfidf/tfidf600.pkl", 
         "FILE" : "best/lgbm/mseed600.pkl", 
     },
@@ -56,6 +52,7 @@ PARAM_DEFAULTS = {
         "USE_TEST" : False,
         "SAVE_MODEL" : False,
         "LOCAL_MODEL_DIR" : "best/svm", 
+        "LOCAL_VEC_DIR" : "best/svm/tfidf", 
         "VFILE" : "best/tfidf/tfidf600.pkl", 
         "FILE" : "best/svm/mseed600.pkl", 
     },
@@ -81,76 +78,46 @@ def get_params(fname="params.ini"):
     config = configparser.ConfigParser()
 
     res = {}
-    config.read(fname)
-        
-    for csec in ["COMMON","LGBM","SVM","BERT","DATAGEN"]: # Cada sección.
-        if csec not in config.keys():
-            res[csec] = deepcopy(PARAM_DEFAULTS[csec]) # En caso de no encontrarse se pone el valor por defecto.
-        else:
-            res[csec] = {}
-            for param in PARAM_DEFAULTS[csec].keys(): # Cada parámetro por sección.
-                if param not in config[csec].keys():
-                    res[csec][param] = PARAM_DEFAULTS[csec][param] # En caso de no encontrarse se pone el valor por defecto.
-                else:
-                    match PARAM_DEFAULTS[csec][param]: # Typecasting y carga de cada parámetro.
-                        case float():
-                            res[csec][param] = float(config[csec][param])
-                        case bool():
-                            res[csec][param] = (config[csec][param] == "True" or config[csec][param] == "true")
-                        case int():
-                            res[csec][param] = int(config[csec][param])
-                        case list():
-                            arr = config[csec][param].split(";")
-                            res[csec][param] = []
-                            for i in arr:
-                                res[csec][param].append(int(i))
-                        case _:
-                            res[csec][param] = config[csec][param]
-   
+    with open(fname):
+        config.read(fname)
+            
+        for csec in ["COMMON","LGBM","SVM","BERT","DATAGEN"]: # Cada sección.
+            if csec not in config.keys():
+                res[csec] = deepcopy(PARAM_DEFAULTS[csec]) # En caso de no encontrarse se pone el valor por defecto.
+            else:
+                res[csec] = {}
+                for param in PARAM_DEFAULTS[csec].keys(): # Cada parámetro por sección.
+                    if param not in config[csec].keys():
+                        res[csec][param] = PARAM_DEFAULTS[csec][param] # En caso de no encontrarse se pone el valor por defecto.
+                    else:
+                        match PARAM_DEFAULTS[csec][param]: # Typecasting y carga de cada parámetro.
+                            case float():
+                                res[csec][param] = float(config[csec][param])
+                            case bool():
+                                res[csec][param] = (config[csec][param] == "True" or config[csec][param] == "true")
+                            case int():
+                                res[csec][param] = int(config[csec][param])
+                            case list():
+                                arr = config[csec][param].split(";")
+                                res[csec][param] = []
+                                for i in arr:
+                                    res[csec][param].append(int(i))
+                            case _:
+                                res[csec][param] = config[csec][param]
+    
     return res
 
 
 
 # Función de normalización de texto.
-def normalize_text(text):
+def normalize_text(text,light=False):
     text = re.sub(r'(\[.*\]\(.*\))|(<URL>)|(http[^\s]+)|(https[^\s]+)', '[URL]', text) # Formateo de URLs.
     text = re.sub(r'(@\w+)|(<USER>)', '[USER]', text) # Formateo usuarios.
-    text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)|\[removed\]','', text) # Quitado &amp;<b><b\> y post eliminados.
-    return text
-
-# Esta función devuelve el índice del elemento más cercano al valor dado de una lista.
-def _closest(v,l):
-    i = 0
-    fi = len(l)
-    d = inf
-    for e in l:
-        di = abs(v-e)
-        if di < d:
-            fi = i
-            d = di
-        i+=1
-    return fi
-
-# Devuelve los pesos de clase de la lista dada. Si FUZZY_BAL_CRISP=True, se redondean las etiquetas para el cálculo.
-def get_class_weights(arr,FUZZY_BAL_CRISP=True):
-
-    if FUZZY_BAL_CRISP: 
-        farr = [int(x >= 0.5) for x in arr]
+    if light: # Si light=True no se eliminan [removed]
+        text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)','', text) # Quitado &amp;<b><b\>
     else:
-        farr = arr
-
-    classes = np.unique(farr)
-
-    class_weights = compute_class_weight(
-        class_weight="balanced",
-        classes=classes,
-        y=farr
-    )
-
-    if FUZZY_BAL_CRISP:
-        return [class_weights[_closest(x,classes)] for x in np.unique(arr)]
-
-    return class_weights
+        text = re.sub(r'(\&amp\;)|(\<b\>)|(\<b\\\/\>)|(\<\\\/b\>)|\[removed\]','', text) # Quitado &amp;<b><b\> y post eliminados.
+    return text
 
 # Calcular métricas a partir de resultados de un modelo SVM o LGBM.
 def compute_metrics(y_test,y_pred,y_probs):
@@ -159,7 +126,8 @@ def compute_metrics(y_test,y_pred,y_probs):
         'balanced_accuracy': balanced_accuracy_score(y_test, y_pred),
         'matthews_corrcoef': matthews_corrcoef(y_test, y_pred),
         'roc_auc_ovr': roc_auc_score(y_test, y_probs),
-        'accuracy': accuracy_score(y_test,y_pred)
+        'accuracy': accuracy_score(y_test,y_pred),
+        'confmat': confusion_matrix(y_test, y_pred)
     }
 
 # Obtener métricas a partir de un modelo y distintas semillas. También devuelve el modelo entrenado de cada semilla.
@@ -167,6 +135,7 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
     results = []
 
     fit_t = []
+
 
     for step, seed in enumerate(seeds):
         if trial is not None:
@@ -210,7 +179,7 @@ def get_results(model,file,seeds,is_test=False,trial=None,save=False,model_path=
             Path(model_path).mkdir(parents=True, exist_ok=True)
             joblib.dump(model, model_path+"/mseed"+str(seed)+".pkl")
             print(f"Guardado modelo de semilla: {seed}")
-       
+
         r = compute_metrics(Y_tst,y_pred,y_probs)
         if trial is not None:
             trial.report(r['macro_f1'],step=step)
@@ -263,7 +232,7 @@ def printtest(seeds,results,times,metric_names):
         for m in metric_names:
             values = [r[m] for r in results]
             print(f"    {m}: {values[i]:.4f}")
-        print(f"    Tiempo de entrenamiento: {timedelta(milliseconds=int(times[i]*1000))}")
+        print(f"    Tiempo de entrenamiento: {times[i]:.4f}s")
     
     print("\n" + "="*30)
     print("RESULTADOS FINALES")
@@ -273,10 +242,34 @@ def printtest(seeds,results,times,metric_names):
     for m in metric_names:
         values = [r[m] for r in results]
         print(f"{m}: {np.mean(values):.4f} (+/- {np.std(values):.4f})")
-    print(f"Tiempo de entrenamiento medio: {timedelta(milliseconds=int(np.mean(times)*1000))}s (+/- {np.std(times):.4f}s)")
+    print(f"Tiempo de entrenamiento medio: {np.mean(times):.4f}s (+/- {np.std(times):.4f}s)")
+
+# Abre una ventana con una matriz de confusión a partir de las métricas obtenidas de un modelo.
+def conf_mat(res,name='confmat'):
+
+    mat = np.array([x[name] for x in res])
+
+    mat_med = np.mean(mat, axis=0)
+    mat_std = np.std(mat, axis=0, ddof=1)
+
+    disp = ConfusionMatrixDisplay(
+        confusion_matrix=mat_med, display_labels=[0, 1]  # Clases 0 y 1
+    )
+
+    disp.plot(cmap=plt.cm.Blues)
+    
+    for i in range(mat_med.shape[0]):
+        for j in range(mat_med.shape[1]):
+            disp.text_[i,j].set_text(f"{mat_med[i,j]:.2f} +/- {mat_std[i,j]:.2f}")
+    
+    plt.title("Matriz de Confusión")
+    plt.xlabel("Predicciones")
+    plt.ylabel("Reales")
+    plt.show()
 
 # Usa los mejores parámetros del estudio pasado y evalua el conjunto de datos de test o validación.
 # Dejar use_test en True si se quieren usar los conjuntos de datos de test, dejar en False si se quiere usar los de validación.
+# También muestra matriz de confusión media y desviación típica.
 def test_study(study,model,file,seeds,use_test,save=False,model_path="",NO_TRAIN=False):
 
     param_grid = study.best_params # Copiamos parámetros desde estudio.
@@ -287,4 +280,5 @@ def test_study(study,model,file,seeds,use_test,save=False,model_path="",NO_TRAIN
     metric_names = ['macro_f1', 'balanced_accuracy', 'matthews_corrcoef', 'roc_auc_ovr','accuracy']
 
     printtest(seeds,results,times,metric_names)
-    
+    conf_mat(results)
+  
