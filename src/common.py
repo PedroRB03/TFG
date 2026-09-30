@@ -39,7 +39,7 @@ PARAM_DEFAULTS = {
         "SAVE_MODEL" : False, 
         "LOCAL_MODEL_DIR" : "best/lgbm", 
         "LOCAL_VEC_DIR" : "best/lgbm/tfidf", 
-        "VFILE" : "best/tfidf/tfidf600.pkl", 
+        "VFILE" : "best/lgbm/tfidf/tfidf600.pkl", 
         "FILE" : "best/lgbm/mseed600.pkl", 
     },
     "SVM" : {
@@ -53,7 +53,7 @@ PARAM_DEFAULTS = {
         "SAVE_MODEL" : False,
         "LOCAL_MODEL_DIR" : "best/svm", 
         "LOCAL_VEC_DIR" : "best/svm/tfidf", 
-        "VFILE" : "best/tfidf/tfidf600.pkl", 
+        "VFILE" : "best/svm/tfidf/tfidf600.pkl", 
         "FILE" : "best/svm/mseed600.pkl", 
     },
     "BERT" : { 
@@ -62,7 +62,7 @@ PARAM_DEFAULTS = {
         "FUZZY" : True, 
         "EARLY_STOP" : 3,
         "BALANCED_CW" : False,
-        "SHOW_LOAD_REPORT" : True, 
+        "SHOW_LOAD_REPORT" : False, 
         "NO_TRAIN" : False,
         "OPT_STUDY" : "bert-study", 
         "OPT_DB" : "sqlite:///results/bert-study.db", 

@@ -5,8 +5,8 @@
 data/pkls
 src/__pycache__
 data/bert_results/*
-results/*
-results/analytics/*
+results
+params
 tmp_trainer
-
 best
+out.txt
