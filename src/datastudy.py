@@ -198,7 +198,7 @@ def stats_freqword(df,N,per_row):
 
 # Obtiene cantidad de filas duplicadas.
 def getdupes(df):
-    return len(df['txt'])-len(df['txt'].drop_duplicates())
+    return len(df['txt'])-len(df['txt'].drop_duplicates(keep=False,ignore_index=True))
 
 if __name__ == "__main__":
 
