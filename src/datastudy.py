@@ -149,7 +149,7 @@ def stats_boxplot(df,pret,fit):
 def stats_wordcloud(df,pret):
     trolling_text = " ".join(df[df['label'] == 'Trolling']['txt']).lower()
     if trolling_text:
-        wc = WordCloud(background_color='white').generate(trolling_text)
+        wc = WordCloud(background_color='white',collocations=False).generate(trolling_text)
         plt.imshow(wc, interpolation='bilinear')
         plt.axis('off')
         plt.title('Palabras comunes')
